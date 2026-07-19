@@ -180,15 +180,18 @@ public sealed class ReplicationControlStore : IReplicationControlStore
     private Task AppendAttemptAsync(
         ReplicableEntityType entityType, string entityKey,
         string message, CancellationToken ct)
-        => _client.PostAsync<object>(SapB1ReplicationConstants.Attempt.Endpoint, new
         {
-            Code         = NewCode(),
-            Name         = $"{entityType}/{entityKey}",
+        var code = NewCode();
+        return _client.PostAsync<object>(SapB1ReplicationConstants.Attempt.Endpoint, new
+        {
+            Code         = code,
+            Name         = $"{entityType}/{entityKey}/{code}",
             U_EntityType = entityType.ToString(),
             U_EntityKey  = entityKey,
             U_Message    = message,
             U_CreatedAt  = DateTime.UtcNow.ToString("yyyy-MM-dd")
         }, ct);
+    }
 
     
 

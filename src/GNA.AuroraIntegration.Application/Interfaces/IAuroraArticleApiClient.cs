@@ -8,8 +8,8 @@ namespace GNA.AuroraIntegration.Application.Interfaces;
 /// </summary>
 public interface IAuroraArticleApiClient
 {
-    Task CreateArticleAsync(CreateArticleDto article, string? warehouse, CancellationToken ct = default);
-    Task UpdateArticleAsync(string sku,UpdateArticleDto article, string? warehouse, CancellationToken ct = default);
-    Task GetArticleBySku(string sku, string? warehouse, CancellationToken ct = default);
+    Task CreateArticleAsync(CreateAuroraArticleDto article, string? warehouse, CancellationToken ct = default);
+    Task UpdateArticleAsync(string sku, UpdateAuroraArticleDto article, string? warehouse, CancellationToken ct = default);
+    Task<AuroraArticleDto?> GetArticleBySkuAsync(string sku, string? warehouse, CancellationToken ct = default);
     // ... resto de métodos según se agreguen use cases (CreateSaleOrder, GetStock, etc.)
 }

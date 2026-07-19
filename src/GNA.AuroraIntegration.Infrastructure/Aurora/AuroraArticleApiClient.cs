@@ -29,14 +29,15 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         _client.AddDefaultHeader("Accept", "application/json");
     }
 
-    public async Task CreateArticleAsync(CreateArticleDto article, string? warehouse, CancellationToken ct = default)
+    public async Task CreateArticleAsync(CreateAuroraArticleDto article, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new(Endpoint, Method.Post);
 
         if (warehouse is not null)
             request.AddQueryParameter("warehouse", warehouse);
 
-        request.AddBody(article);
+        var json = JsonSerializer.Serialize(article);
+        request.AddJsonBody(json);
 
         RestResponse response;
         try
@@ -62,14 +63,15 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         }
     }
 
-    public async Task UpdateArticleAsync(string sku, UpdateArticleDto article, string? warehouse, CancellationToken ct = default)
+    public async Task UpdateArticleAsync(string sku, UpdateAuroraArticleDto article, string? warehouse, CancellationToken ct = default)
     {
-        RestRequest request = new(Endpoint, Method.Patch);
+        RestRequest request = new($"{Endpoint}/{sku}", Method.Patch);
 
         if (warehouse is not null)
             request.AddQueryParameter("warehouse", warehouse);
 
-        request.AddBody(article);
+        var json = JsonSerializer.Serialize(article);
+        request.AddJsonBody(json);
 
         RestResponse response;
         try
@@ -95,7 +97,7 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         }
     }
 
-    public async Task GetArticleBySku(string sku, string? warehouse, CancellationToken ct = default)
+    public async Task<AuroraArticleDto?> GetArticleBySkuAsync(string sku, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{sku}", Method.Get);
         if (warehouse is not null)       
@@ -119,5 +121,7 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
                 response.StatusCode, sku, response.Content);
             throw new ArticleAuroraApiException(sku, $"Error obteniendo artículo {sku}: {response.StatusCode}");
         }
+
+        return JsonSerializer.Deserialize<AuroraArticleDto?>(response.Content ?? string.Empty);
     }
 }

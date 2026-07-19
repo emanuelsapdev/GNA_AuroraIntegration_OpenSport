@@ -80,7 +80,7 @@ namespace GNA.AuroraIntegration.Tests
                 .ReturnsAsync(pendingArticles);
             _output.WriteLine($"📦 Artículos pendientes de sincronización: {pendingArticles.Count}");
 
-            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.IsAny<CreateArticleDto>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new ArticleAuroraApiException(It.IsAny<string>(), "Simulated API failure")); // Simulamos una excepción al llamar al API
             _output.WriteLine("⚠️ Simulación de fallo en el cliente API al crear artículo");
 
@@ -133,7 +133,7 @@ namespace GNA.AuroraIntegration.Tests
                 .ReturnsAsync(pendingArticles);
             _output.WriteLine($"📦 Artículos pendientes de sincronización: {pendingArticles.Count}");
 
-            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.IsAny<CreateArticleDto>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new ArticleAuroraApiException("A001", "Simulated API failure"));
             _output.WriteLine("⚠️ Simulación de fallo en Aurora al crear artículo, se espera que se llame a MarkArticleAsFailedAsync");
 
@@ -159,9 +159,9 @@ namespace GNA.AuroraIntegration.Tests
             _repositoryMock.Setup(r => r.GetPendingArticlesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(pendingArticles);
             _output.WriteLine($"📦 Artículos pendientes de sincronización: {pendingArticles.Count}");
-            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.Is<CreateArticleDto>(dto => dto.Sku == "A001"), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.Is<CreateAuroraArticleDto>(dto => dto.Sku == "A001"), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask); // A001 se procesa correctamente
-            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.Is<CreateArticleDto>(dto => dto.Sku == "A002"), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            _apiAuroraMock.Setup(c => c.CreateArticleAsync(It.Is<CreateAuroraArticleDto>(dto => dto.Sku == "A002"), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new ArticleAuroraApiException("A002", "Simulated API failure")); // A002 falla
             // Act
             var (processed, successful, failed) = await _useCase.ExecuteAsync();
