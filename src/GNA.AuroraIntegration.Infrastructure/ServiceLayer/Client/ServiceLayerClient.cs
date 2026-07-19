@@ -5,6 +5,7 @@ using RestSharp.Serializers.Json;
 using GNA.AuroraIntegration.Application.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly;
 
 namespace GNA.AuroraIntegration.Infrastructure.ServiceLayer.Client;
 
@@ -17,6 +18,7 @@ public sealed class ServiceLayerClient : IServiceLayerClient
     private readonly RestClient _client;
     private readonly ServiceLayerSettings _settings;
     private readonly ILogger<ServiceLayerClient> _logger;
+    private readonly AsyncPolicy _resiliencePolicy;
     private readonly SemaphoreSlim _loginLock = new(1, 1);
     private bool _authenticated;
 
@@ -43,6 +45,16 @@ public sealed class ServiceLayerClient : IServiceLayerClient
                 new JsonSerializerOptions { PropertyNamingPolicy = null }));
         _client.AddDefaultHeader("Accept", "application/json");
         _client.AddDefaultHeader("Accept-Language", "es-ES");
+
+        AsyncPolicy retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+        AsyncPolicy circuitBreakerPolicy = Policy
+            .Handle<HttpRequestException>()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+
+        _resiliencePolicy = Policy.WrapAsync(retryPolicy, circuitBreakerPolicy);
     }
 
     public async Task<T?> GetAsync<T>(string resource, CancellationToken ct = default)
@@ -66,7 +78,12 @@ public sealed class ServiceLayerClient : IServiceLayerClient
         if (body is not null)
             request.AddJsonBody(body);
 
-        RestResponse<T> response = await _client.ExecuteAsync<T>(request, ct);
+        RestResponse<T> response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+        {
+            RestResponse<T> transientResponse = await _client.ExecuteAsync<T>(request, innerCt);
+            ThrowIfTransientFailure(transientResponse, method, resource);
+            return transientResponse;
+        }, ct);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized && !isRetry)
         {
@@ -84,6 +101,17 @@ public sealed class ServiceLayerClient : IServiceLayerClient
         }
 
         return response.Data;
+    }
+
+    private static void ThrowIfTransientFailure(RestResponseBase response, Method method, string resource)
+    {
+        if (response.StatusCode == HttpStatusCode.RequestTimeout ||
+            (int)response.StatusCode >= 500 ||
+            response.StatusCode == 0)
+        {
+            throw new HttpRequestException(
+                $"Service Layer transient error {(int)response.StatusCode} en {method} {resource}: {response.Content}");
+        }
     }
 
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)
@@ -110,7 +138,12 @@ public sealed class ServiceLayerClient : IServiceLayerClient
             _logger.LogDebug("Enviando POST /Login a {BaseUrl} para usuario {UserName}",
                 _settings.BaseUrl, _settings.UserName);
 
-            RestResponse response = await _client.ExecuteAsync(request, ct);
+            RestResponse response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+            {
+                RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
+                ThrowIfTransientFailure(transientResponse, Method.Post, "Login");
+                return transientResponse;
+            }, ct);
 
             if (!response.IsSuccessful)
             {

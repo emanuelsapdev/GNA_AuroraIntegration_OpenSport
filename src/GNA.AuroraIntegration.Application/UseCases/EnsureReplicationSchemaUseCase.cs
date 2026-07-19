@@ -6,11 +6,6 @@ using GNA.AuroraIntegration.Domain.Interfaces;
 
 namespace GNA.AuroraIntegration.Application.UseCases;
 
-public interface IEnsureReplicationSchemaUseCase
-{
-    Task ExecuteAsync(CancellationToken ct = default);
-}
-
 /// <summary>
 /// Garantiza al arranque que existan las tablas compartidas de replicación:
 /// @GNA_REP_QUEUE (estado vivo de cada entidad pendiente) y

@@ -43,6 +43,17 @@ internal static class SapB1ReplicationConstants
             public const string Failed     = "FAILED";
         }
 
+        
+        public static class MaxRetryCounts
+        {
+            public const int Article = 4;
+        }
+
+        public static class ExcludedStatuses
+        {
+            public static readonly string[] Article = new[] { StatusValues.Replicated };
+        }
+
         /// <summary>Valores posibles del campo U_Operation.</summary>
         public static class OperationValues
         {

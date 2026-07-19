@@ -38,24 +38,51 @@ public sealed class ReplicationControlStore : IReplicationControlStore
     public async Task<IReadOnlyList<string>> GetPendingKeysAsync(
         ReplicableEntityType entityType, int batchSize = 100, CancellationToken ct = default)
     {
-        var resource = $"{SapB1ReplicationConstants.Queue.Endpoint}" +
-                       $"?$filter={SapB1ReplicationConstants.Queue.EntityType} eq '{entityType}'" +
-                       $" and {SapB1ReplicationConstants.Queue.Status} eq '{SapB1ReplicationConstants.Queue.StatusValues.Pending}'" +
-                       $"&$top={batchSize}&$select={SapB1ReplicationConstants.Queue.EntityKey}";
+        const int pageSize = 25;
+        var collected = new List<string>(batchSize);
+        int skip = 0;
 
-        var result = await _client.GetAsync<UdoCollection<QueueRow>>(resource, ct);
-        return result?.Value.Select(r => r.EntityKey).ToList()
-               ?? (IReadOnlyList<string>)[];
+        while (collected.Count < batchSize)
+        {
+            int remaining = batchSize - collected.Count;
+            int top = Math.Min(pageSize, remaining);
+
+            var resource = $"{SapB1ReplicationConstants.Queue.Endpoint}" +
+                           $"?$filter={SapB1ReplicationConstants.Queue.EntityType} eq '{entityType}'" +
+                           $" and {SapB1ReplicationConstants.Queue.Status} eq '{SapB1ReplicationConstants.Queue.StatusValues.Pending}'" +
+                           $"&$orderby={SapB1ReplicationConstants.Queue.EntityKey} asc" +
+                           $"&$skip={skip}" +
+                           $"&$top={top}" +
+                           $"&$select={SapB1ReplicationConstants.Queue.EntityKey}";
+
+            UdoCollection<QueueRow>? result = await _client.GetAsync<UdoCollection<QueueRow>>(resource, ct);
+            List<string> page = result?.Value.Select(r => r.EntityKey).ToList() ?? [];
+
+            if (page.Count == 0)
+            {
+                break;
+            }
+
+            collected.AddRange(page);
+            skip += page.Count;
+
+            if (page.Count < top)
+            {
+                break;
+            }
+        }
+
+        return collected;
     }
 
     // ── Escritura ────────────────────────────────────────────────────────────
 
     public async Task EnqueueAsync(
         ReplicableEntityType entityType, string entityKey,
-        ReplicationOperationType operationType, CancellationToken ct = default)
+        ReplicationOperationType operationType, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default)
     {
         // Idempotente: si ya existe una entrada activa no se duplica.
-        var existing = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, ct), entityType, entityKey, "buscar en cola", ct);
+        var existing = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, maxRetryCount, excludedStatuses, ct), entityType, entityKey, "buscar en cola", ct);
         if (existing is not null)
         {
             _logger.LogDebug("'{Key}' [{Type}] ya está en cola, se omite el encolado.", entityKey, entityType);
@@ -81,9 +108,9 @@ public sealed class ReplicationControlStore : IReplicationControlStore
     }
 
     public async Task MarkAsReplicatedAsync(
-        ReplicableEntityType entityType, string entityKey, CancellationToken ct = default)
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default)
     {
-        QueueRow? entry = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, ct), entityType, entityKey, "buscar en cola", ct);
+        QueueRow? entry = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, maxRetryCount, excludedStatuses, ct), entityType, entityKey, "buscar en cola", ct);
         if (entry is null)
         {
             _logger.LogWarning(
@@ -104,11 +131,10 @@ public sealed class ReplicationControlStore : IReplicationControlStore
     }
 
     public async Task MarkAsFailedAsync(
-        ReplicableEntityType entityType, string entityKey,
-        string errorMessage, CancellationToken ct = default)
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, string errorMessage, IEnumerable<string> excludedStatuses, CancellationToken ct = default)
     {
 
-        QueueRow? entry = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, ct), entityType, entityKey, "buscar en cola", ct);
+        QueueRow? entry = await ExecuteAsync(() => FindQueueEntryAsync(entityType, entityKey, maxRetryCount, excludedStatuses, ct), entityType, entityKey, "buscar en cola", ct);
         if (entry is null)
         {
             _logger.LogWarning(
@@ -167,11 +193,18 @@ public sealed class ReplicationControlStore : IReplicationControlStore
         => ExecuteAsync(async () => { await operation(); return true; }, entityType, entityKey, action, ct);
 
     private async Task<QueueRow?> FindQueueEntryAsync(
-        ReplicableEntityType entityType, string entityKey, CancellationToken ct)
+    ReplicableEntityType entityType, string entityKey, int maxRetryCount,
+    IEnumerable<string> excludedStatuses, CancellationToken ct)
     {
+        var statusFilter = string.Join(" and ",
+            excludedStatuses.Select(s => $"{SapB1ReplicationConstants.Queue.Status} ne '{s}'"));
+
         var resource = $"{SapB1ReplicationConstants.Queue.Endpoint}" +
                        $"?$filter={SapB1ReplicationConstants.Queue.EntityType} eq '{entityType}'" +
-                       $" and {SapB1ReplicationConstants.Queue.EntityKey} eq '{entityKey}'&$top=1";
+                       $" and {SapB1ReplicationConstants.Queue.EntityKey} eq '{entityKey}'" +
+                       $" and ({statusFilter ?? "1 eq 1"})" +
+                       $" and {SapB1ReplicationConstants.Queue.RetryCount} le {maxRetryCount}" +
+                       "&$top=1";
 
         var result = await _client.GetAsync<UdoCollection<QueueRow>>(resource, ct);
         return result?.Value.FirstOrDefault();
@@ -189,7 +222,7 @@ public sealed class ReplicationControlStore : IReplicationControlStore
             U_EntityType = entityType.ToString(),
             U_EntityKey  = entityKey,
             U_Message    = message,
-            U_CreatedAt  = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            U_CreatedAt  = DateTime.Now.ToString("yyyy-MM-dd")
         }, ct);
     }
 

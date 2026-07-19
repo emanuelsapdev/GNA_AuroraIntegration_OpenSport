@@ -22,7 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\GNA.AuroraIntegration.Application\GNA.AuroraIntegration.Application.csproj" />
-    <ProjectReference Include="..\..\src\GNA.AuroraIntegration.Infrastructure\GNA.AuroraIntegration.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\GNA.AuroraIntegration.Domain\GNA.AuroraIntegration.Domain.csproj" />
   </ItemGroup>
 
 </Project>

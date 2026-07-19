@@ -2,6 +2,7 @@
 using GNA.AuroraIntegration.Domain.Enums;
 using GNA.AuroraIntegration.Domain.Exceptions;
 using GNA.AuroraIntegration.Domain.Interfaces;
+using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Constants;
 
 namespace GNA.AuroraIntegration.Infrastructure.Repositories;
 
@@ -31,8 +32,8 @@ public sealed class ArticleReplicationRepository : IArticleReplicationRepository
     }
 
     public Task MarkArticleAsReplicatedAsync(string sku, CancellationToken ct = default)
-        => _store.MarkAsReplicatedAsync(ReplicableEntityType.Article, sku, ct);
+        => _store.MarkAsReplicatedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, SapB1ReplicationConstants.Queue.ExcludedStatuses.Article, ct);
 
     public Task MarkArticleAsFailedAsync(string sku, string errorMessage, CancellationToken ct = default)
-        => _store.MarkAsFailedAsync(ReplicableEntityType.Article, sku, errorMessage, ct);
+        => _store.MarkAsFailedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, errorMessage, SapB1ReplicationConstants.Queue.ExcludedStatuses.Article, ct);
 }

@@ -2,6 +2,9 @@ using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Application.UseCases;
 using GNA.AuroraIntegration.Application.UseCases.Outbound;
 using GNA.AuroraIntegration.Domain.Interfaces;
+using GNA.AuroraIntegration.Application.UseCases.Outbound.Decorators;
+using GNA.AuroraIntegration.Application.Validation;
+using GNA.AuroraIntegration.Host.Health;
 using GNA.AuroraIntegration.Host.Jobs;
 using GNA.AuroraIntegration.Host.Startup;
 using GNA.AuroraIntegration.Infrastructure.Aurora;
@@ -9,7 +12,6 @@ using GNA.AuroraIntegration.Infrastructure.Repositories;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Client;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Repositories;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Services;
-using Microsoft.Extensions.Options;
 using Quartz;
 using Serilog;
 
@@ -45,7 +47,9 @@ builder.Services.AddScoped<IArticleReplicationRepository, ArticleReplicationRepo
 
 // Agregar repositorios y casos de uso
 builder.Services.AddScoped<IEnsureReplicationSchemaUseCase, EnsureReplicationSchemaUseCase>();
+builder.Services.AddScoped<IArticlePayloadValidator, ArticlePayloadValidator>();
 builder.Services.AddScoped<IArticleSyncUseCase, ArticleSyncUseCase>();
+builder.Services.Decorate<IArticleSyncUseCase, ArticleSyncUseCaseLoggingDecorator>();
 
 // ---- Bootstrap de esquema: SIEMPRE antes de Quartz ----
 builder.Services.AddHostedService<SchemaBootstrapperHostedService>(); // DESCOMENTAR 
@@ -61,6 +65,9 @@ builder.Services.AddQuartz(q =>
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 
+builder.Services.AddHealthChecks()
+    .AddCheck<ServiceLayerHealthCheck>("service-layer");
+
 var app = builder.Build();
 
 // Configurar el endpoint para recibir eventos de Aurora
@@ -68,5 +75,6 @@ app.MapPost("/events/status", () => "Hola Mundo"); // TODO: reemplazar por use c
 
 // Endpoint de prueba para validar que la API está en línea
 app.MapGet("/", () => Results.Ok(new { message = "Endpoint de prueba funcionando" }));
+app.MapHealthChecks("/health");
 
 app.Run();

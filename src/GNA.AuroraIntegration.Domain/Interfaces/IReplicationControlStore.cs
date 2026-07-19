@@ -15,11 +15,11 @@ public interface IReplicationControlStore
 
     Task EnqueueAsync(
         ReplicableEntityType entityType, string entityKey,
-        ReplicationOperationType operationType, CancellationToken ct = default);
+        ReplicationOperationType operationType, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
 
     Task MarkAsReplicatedAsync(
-        ReplicableEntityType entityType, string entityKey, CancellationToken ct = default);
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
 
     Task MarkAsFailedAsync(
-        ReplicableEntityType entityType, string entityKey, string errorMessage, CancellationToken ct = default);
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, string errorMessage, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
 }

@@ -3,9 +3,10 @@ using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Polly;
 using RestSharp;
+using System.Net;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace GNA.AuroraIntegration.Infrastructure.Aurora;
 
@@ -14,6 +15,7 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
     private const string Endpoint = "aurora-erp/articles";
 
     private readonly RestClient _client;
+    private readonly AsyncPolicy _resiliencePolicy;
     private readonly ILogger<AuroraArticleApiClient> _logger;
 
     public AuroraArticleApiClient(IOptions<AuroraApiSettings> settings, ILogger<AuroraArticleApiClient> logger)
@@ -27,6 +29,16 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         _client = new RestClient(options);
         _client.AddDefaultHeader("X-Api-Key", cfg.ApiKey);
         _client.AddDefaultHeader("Accept", "application/json");
+
+        AsyncPolicy retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+        AsyncPolicy circuitBreakerPolicy = Policy
+            .Handle<HttpRequestException>()
+            .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+
+        _resiliencePolicy = Policy.WrapAsync(retryPolicy, circuitBreakerPolicy);
     }
 
     public async Task CreateArticleAsync(CreateAuroraArticleDto article, string? warehouse, CancellationToken ct = default)
@@ -42,7 +54,12 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         RestResponse response;
         try
         {
-            response = await _client.ExecuteAsync(request, ct);
+            response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+            {
+                RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
+                ThrowIfTransientFailure(transientResponse, Method.Post, Endpoint);
+                return transientResponse;
+            }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -76,7 +93,12 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         RestResponse response;
         try
         {
-            response = await _client.ExecuteAsync(request, ct);
+            response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+            {
+                RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
+                ThrowIfTransientFailure(transientResponse, Method.Patch, $"{Endpoint}/{sku}");
+                return transientResponse;
+            }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -105,7 +127,12 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         RestResponse response;               
         try
         {
-            response = await _client.ExecuteAsync(request, ct);    
+            response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+            {
+                RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
+                ThrowIfTransientFailure(transientResponse, Method.Get, $"{Endpoint}/{sku}");
+                return transientResponse;
+            }, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException) 
         {
@@ -114,6 +141,11 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
             throw new ArticleAuroraApiException(
                 sku, $"Error de conexión al obtener el artículo '{sku}' en Aurora.", ex);                           
         }
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
         if (!response.IsSuccessful)
         {
             _logger.LogError(
@@ -123,5 +155,16 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
         }
 
         return JsonSerializer.Deserialize<AuroraArticleDto?>(response.Content ?? string.Empty);
+    }
+
+    private static void ThrowIfTransientFailure(RestResponseBase response, Method method, string resource)
+    {
+        if (response.StatusCode == HttpStatusCode.RequestTimeout ||
+            (int)response.StatusCode >= 500 ||
+            response.StatusCode == 0)
+        {
+            throw new HttpRequestException(
+                $"Aurora transient error {(int)response.StatusCode} en {method} {resource}: {response.Content}");
+        }
     }
 }

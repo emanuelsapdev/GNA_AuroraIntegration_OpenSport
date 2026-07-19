@@ -71,7 +71,7 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
     /// ⚠️ Ajustar según la forma real de Article.cs.
     /// </summary>
     private static Article MapToArticle(ServiceLayerItemDto dto)
-        => new Article { Sku = dto.ItemCode, Name = dto.ItemName, PrimaryEan = dto.BarCode };
+        => new Article { Sku = dto.ItemCode, Name = dto.ItemName, PrimaryEan = dto.BarCode, AdditionalEans = [ dto.BarCode ] };
 
     private static string EscapeODataValue(string value) => value.Replace("'", "''");
 
