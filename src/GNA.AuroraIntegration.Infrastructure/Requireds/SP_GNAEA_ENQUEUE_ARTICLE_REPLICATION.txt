@@ -1,0 +1,49 @@
+﻿CREATE PROCEDURE SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+    OUT error_code    INT,
+    OUT error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+    
+	IF (:object_type = '4' AND :transaction_type IN ('A', 'U')) THEN
+	
+		DECLARE v_exists  INT := 0;
+	    DECLARE v_code    NVARCHAR(50);
+		DECLARE v_item_code    NVARCHAR(255);
+		DECLARE v_operation    NVARCHAR(1);
+		
+		v_item_code := :list_of_cols_val_tab_del;
+		
+		IF (:transaction_type = 'A') THEN 
+			v_operation := 'I';
+		ELSE 
+			v_operation := 'U';
+		END IF;
+	
+	    -- Evitar encolar duplicados si ya hay un pendiente para este artículo
+	    SELECT COUNT(*) INTO v_exists
+	    FROM "@GNA_REP_QUEUE"
+	    WHERE "U_EntityType" = 'Article'
+	      AND "U_EntityKey"  = :v_item_code
+	      AND "U_Status"     = 'PENDING';
+	
+	    IF :v_exists = 0 THEN
+	        v_code := 'ART-' || :v_item_code || '-' || TO_VARCHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS');
+	
+	        INSERT INTO "@GNA_REP_QUEUE"
+	            ("Code", "Name", "U_EntityType", "U_EntityKey", "U_Operation", "U_Status", "U_RetryCount")
+	        VALUES
+	            (:v_code, :v_code, 'Article', :v_item_code, :v_operation, 'PENDING', 0);
+	    END IF;
+	        
+	    SELECT :error_code, :error_message FROM DUMMY;
+	    RETURN;
+    END IF;
+
+END;

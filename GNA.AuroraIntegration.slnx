@@ -1,0 +1,17 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/GNA.AuroraIntegration.Application/GNA.AuroraIntegration.Application.csproj" />
+    <Project Path="src/GNA.AuroraIntegration.Domain/GNA.AuroraIntegration.Domain.csproj" />
+    <Project Path="src/GNA.AuroraIntegration.Host/GNA.AuroraIntegration.Host.csproj">
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/GNA.AuroraIntegration.Infrastructure/GNA.AuroraIntegration.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GNA.AuroraIntegration.Tests/GNA.AuroraIntegration.Tests.csproj" />
+  </Folder>
+</Solution>
