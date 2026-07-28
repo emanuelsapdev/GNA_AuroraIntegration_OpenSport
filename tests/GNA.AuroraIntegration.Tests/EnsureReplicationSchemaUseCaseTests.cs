@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 namespace GNA.AuroraIntegration.Tests;
 
 /// <summary>
-/// Tests para validar la creación de las tablas y campos de replicación.
+/// Tests para validar la creación de las tablas, campos y objetos de usuario del esquema de replicación.
 /// </summary>
 public class EnsureReplicationSchemaUseCaseTests
 {
@@ -25,7 +25,7 @@ public class EnsureReplicationSchemaUseCaseTests
         _output = output;
     }
 
-    [Fact(DisplayName = "⏺ Debe crear la tabla GNA_REP_QUEUE con los parametros esperados.")]
+    [Fact(DisplayName = "✓ Debe crear la tabla GNA_REP_QUEUE con los paranmetros esperados.")]
     public async Task ExecuteAsync_ShouldCreateQueueTable()
     {
         _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_REP_QUEUE");
@@ -49,7 +49,61 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Tabla GNA_REP_QUEUE creada correctamente");
     }
 
-    [Fact(DisplayName = "⏺ Debe crear la tabla GNA_REP_ATTEMPT con los parametros esperados.")]
+    [Fact(DisplayName = "✓ Debe crear los campos en la tabla GNA_REP_QUEUE.")]
+    public async Task ExecuteAsync_ShouldCreateQueueTableFields()
+    {
+        _output.WriteLine("🔄 INICIO: Validando campos en tabla GNA_REP_QUEUE");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert - EntityType
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.QueueTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.QueueTable.Fields.EntityType &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        // Assert - EntityKey
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.QueueTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.QueueTable.Fields.EntityKey &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        // Assert - Operation
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.QueueTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.QueueTable.Fields.Operation &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        // Assert - Status
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.QueueTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.QueueTable.Fields.Status &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Todos los campos de GNA_REP_QUEUE creados correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear la tabla GNA_REP_ATTEMPT con los parámetros esperados.")]
     public async Task ExecuteAsync_ShouldCreateAttemptTable()
     {
         _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_REP_ATTEMPT");
@@ -73,7 +127,7 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Tabla GNA_REP_ATTEMPT creada correctamente");
     }
 
-    [Fact(DisplayName = "⏺ Campo RetryCount debe crearse en GNA_REP_QUEUE con tipo Numeric")]
+    [Fact(DisplayName = "✓ Campo RetryCount debe crearse en GNA_REP_QUEUE con tipo Numeric")]
     public async Task ExecuteAsync_ShouldCreateRetryCountFieldInQueue()
     {
         _output.WriteLine("🔄 INICIO: Validando campo RetryCount en GNA_REP_QUEUE");
@@ -98,7 +152,135 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Campo RetryCount creado correctamente");
     }
 
-    [Fact(DisplayName = "⏺ Debe ejecutar el número correcto de operaciones totales")]
+    [Fact(DisplayName = "✓ Debe crear la tabla GN_CATLOG (Categorías Logísticas)")]
+    public async Task ExecuteAsync_ShouldCreateLogisticsCategoryTable()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de tabla GN_CATLOG");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserTableAsync(
+                It.Is<UserTableDefinition>(t =>
+                    t.TableName == ReplicationSchemaConstants.LogisticsCategoryTable.Name &&
+                    t.TableDescription == ReplicationSchemaConstants.LogisticsCategoryTable.Description &&
+                    t.TableType == UserTableType.MasterData),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Tabla GN_CATLOG creada correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Categorías Logísticas")]
+    public async Task ExecuteAsync_ShouldCreateLogisticsCategoryUserObject()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Categorías");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserObjectAsync(
+                It.Is<UserObjectDefinition>(o =>
+                    o.Code == ReplicationSchemaConstants.LogisticsCategoryUserObject.Code &&
+                    o.TableName == ReplicationSchemaConstants.LogisticsCategoryUserObject.TableName),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Objeto usuario para Categorías creado correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear la tabla GN_MARCAS (Marcas de Productos)")]
+    public async Task ExecuteAsync_ShouldCreateProductBrandsTable()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de tabla GN_MARCAS");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserTableAsync(
+                It.Is<UserTableDefinition>(t =>
+                    t.TableName == ReplicationSchemaConstants.ProductBrandsTable.Name &&
+                    t.TableDescription == ReplicationSchemaConstants.ProductBrandsTable.Description &&
+                    t.TableType == UserTableType.MasterData),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Tabla GN_MARCAS creada correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Marcas de Productos")]
+    public async Task ExecuteAsync_ShouldCreateProductBrandsUserObject()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Marcas");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserObjectAsync(
+                It.Is<UserObjectDefinition>(o =>
+                    o.Code == ReplicationSchemaConstants.ProductBrandsUserObject.Code &&
+                    o.TableName == ReplicationSchemaConstants.ProductBrandsUserObject.TableName),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Objeto usuario para Marcas creado correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear campos de Categoría Logística y Marca en OITM")]
+    public async Task ExecuteAsync_ShouldCreateArticlesFields()
+    {
+        _output.WriteLine("🔄 INICIO: Validando campos en tabla OITM");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert - LogisticsCategory field
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.ItemsTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.ItemsTable.Fields.LogisticsCategory &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        // Assert - ProductBrand field
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.ItemsTable.DbName,
+                It.Is<UserFieldDefinition>(f =>
+                    f.Name == ReplicationSchemaConstants.ItemsTable.Fields.ProductBrand &&
+                    f.Type == UserFieldType.Alpha),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Campos en OITM creados correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe ejecutar el número correcto de operaciones totales")]
     public async Task ExecuteAsync_ShouldCreateCorrectNumberOfTotalOperations()
     {
         _output.WriteLine("🔄 INICIO: Contando operaciones totales");
@@ -125,16 +307,31 @@ public class EnsureReplicationSchemaUseCaseTests
             })
             .Returns(Task.CompletedTask);
 
+        _mockSchemaService
+            .Setup(x => x.EnsureUserObjectAsync(It.IsAny<UserObjectDefinition>(), ct))
+            .Callback(() =>
+            {
+                totalOperations++;
+                _output.WriteLine("   📋 Operación #{0}: Crear objeto usuario", totalOperations);
+            })
+            .Returns(Task.CompletedTask);
+
         // Act
         await _useCase.ExecuteAsync(ct);
 
-        // Assert - 2 tablas + 9 campos = 11 operaciones totales
+        // Assert
+        // 4 tablas + 11 campos + 2 objetos usuario = 17 operaciones totales
+        // - QueueTable: 1 tabla + 5 campos
+        // - AttemptTable: 1 tabla + 4 campos
+        // - LogisticsCategoryTable: 1 tabla + 1 user object
+        // - ProductBrandsTable: 1 tabla + 1 user object
+        // - ItemsTable: 2 campos
         _output.WriteLine("📊 Total de operaciones ejecutadas: {0}", totalOperations);
-        Assert.Equal(11, totalOperations);
+        Assert.Equal(17, totalOperations);
         _output.WriteLine("✅ ÉXITO: Número de operaciones es correcto");
     }
 
-    [Fact(DisplayName = "⏺ Debe manejar correctamente las excepciones del servicio")]
+    [Fact(DisplayName = "✓ Debe manejar correctamente las excepciones del servicio")]
     public async Task ExecuteAsync_ShouldHandleServiceException()
     {
         _output.WriteLine("🔄 INICIO: Validando manejo de excepciones");
@@ -150,7 +347,7 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Excepción capturada correctamente");
     }
 
-    [Fact(DisplayName = "⏺ Debe manejar OperationCanceledException")]
+    [Fact(DisplayName = "✓ Debe manejar OperationCanceledException")]
     public async Task ExecuteAsync_ShouldHandleOperationCanceledException()
     {
         _output.WriteLine("🔄 INICIO: Validando manejo de OperationCanceledException");

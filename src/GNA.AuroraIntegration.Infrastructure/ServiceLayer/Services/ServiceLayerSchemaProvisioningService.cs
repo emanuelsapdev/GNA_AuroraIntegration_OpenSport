@@ -73,7 +73,8 @@ public sealed class ServiceLayerSchemaProvisioningService : ISchemaProvisioningS
                 Description = field.Description,
                 Type        = UserFieldTypeMapper.ToServiceLayerLiteral(field.Type),
                 SubType     = UserFieldSubTypeMapper.ToServiceLayerLiteral(field.SubType),
-                Size        = field.Size
+                Size        = field.Size,
+                LinkedTable = field.LinkedTable
             }, ct);
 
             _logger.LogInformation("UDF '{Field}' creado en '{Table}'.", field.Name, tableName);
@@ -84,6 +85,42 @@ public sealed class ServiceLayerSchemaProvisioningService : ISchemaProvisioningS
             //    $"No se pudo crear el campo de usuario '{field.Name}' en '{tableName}'.", ex);
             _logger.LogWarning($"{tableName}.{field.Name}",
                 $"No se pudo crear el campo de usuario '{field.Name}' en '{tableName}'.");
+        }
+    }
+
+    public async Task EnsureUserObjectAsync(UserObjectDefinition userObject, CancellationToken ct = default)
+    {
+        var existing = await _client.GetAsync<object>($"UserObjectsMD('{userObject.Code}')", ct);
+        if (existing is not null)
+        {
+            _logger.LogInformation("UDO '{Code}' ya existe. Se omite creación.", userObject.Code);
+            return;
+        }
+
+        try
+        {
+            await _client.PostAsync<object>("UserObjectsMD", new
+            {
+                Code = userObject.Code,
+                Name = userObject.Name,
+                TableName = userObject.TableName,
+                CanClose = SapYesNoMapper.ToServiceLayerLiteral(userObject.CanClose),
+                CanFind = SapYesNoMapper.ToServiceLayerLiteral(userObject.CanFind),
+                MenuItem = SapYesNoMapper.ToServiceLayerLiteral(userObject.MenuItem),
+                MenuCaption = userObject.MenuCaption,
+                FatherMenuID = userObject.FatherMenuID,
+                Position = userObject.Position,
+                MenuUID = userObject.MenuUID,
+                CanCreateDefaultForm = SapYesNoMapper.ToServiceLayerLiteral(userObject.CanCreateDefaultForm),
+                ObjectType = UserObjectTypeMapper.ToServiceLayerLiteral(userObject.ObjectType)
+            }, ct);
+
+            _logger.LogInformation("UDO '{Code}' creada exitosamente.", userObject.Code);
+        }
+        catch (Exception ex)
+        {
+            throw new SchemaProvisioningException(userObject.Code,
+                $"No se pudo crear la UDO '{userObject.Code}'.", ex);
         }
     }
 }

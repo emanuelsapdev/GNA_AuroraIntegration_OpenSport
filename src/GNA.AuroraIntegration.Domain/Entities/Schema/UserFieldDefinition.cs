@@ -14,13 +14,15 @@ public sealed class UserFieldDefinition
     public UserFieldType Type { get; }
     public int? Size { get; }
     public UserFieldSubType SubType { get; }
+    public string? LinkedTable { get; }
 
     public UserFieldDefinition(
         string name,
         string description,
         UserFieldType type,
         UserFieldSubType subType = UserFieldSubType.None,
-        int? size = null)
+        int? size = null,
+        string? linkedTable = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name no puede ser vacío.", nameof(name));
@@ -30,5 +32,6 @@ public sealed class UserFieldDefinition
         Type = type;
         SubType = subType;
         Size = size;
+        LinkedTable = linkedTable;
     }
 }

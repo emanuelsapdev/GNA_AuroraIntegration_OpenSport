@@ -1,6 +1,4 @@
-﻿// Infrastructure/ServiceLayer/Mapping/UserTableTypeMapper.cs
-using GNA.AuroraIntegration.Domain.Enums;
-using GNA.AuroraIntegration.Domain.Enums.Schema;
+﻿using GNA.AuroraIntegration.Domain.Enums.Schema;
 
 namespace GNA.AuroraIntegration.Infrastructure.ServiceLayer.Mapping;
 

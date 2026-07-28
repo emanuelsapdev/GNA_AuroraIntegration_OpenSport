@@ -13,4 +13,7 @@ public interface ISchemaProvisioningService
 
     /// <summary>Crea el campo sobre la tabla indicada si no existe. No falla si ya existe.</summary>
     Task EnsureUserFieldAsync(string tableName, UserFieldDefinition field, CancellationToken ct = default);
+
+    /// <summary>Crea el objeto de usuario (UDO) si no existe. No falla si ya existe.</summary>
+    Task EnsureUserObjectAsync(UserObjectDefinition userObject, CancellationToken ct = default);
 }
