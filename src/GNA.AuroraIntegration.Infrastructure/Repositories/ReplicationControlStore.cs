@@ -13,8 +13,8 @@ namespace GNA.AuroraIntegration.Infrastructure.Repositories;
 
 /// <summary>
 /// Implementa IReplicationControlStore sobre las UDTs de SAP B1 vía Service Layer.
-///   @GNA_REP_QUEUE   – estado vivo de cada entidad pendiente.
-///   @GNA_REP_ATTEMPT – histórico de intentos (OK y fallidos).
+///   @GNA_AUR_REP_QUEUE   – estado vivo de cada entidad pendiente.
+///   @GNA_AUR_REP_ATTEMPT – histórico de intentos (OK y fallidos).
 ///
 /// Las UDTs se exponen en Service Layer como /U_TABLENAME.
 /// La clave primaria es el campo Code (string, máx. 8 chars alfanuméricos).

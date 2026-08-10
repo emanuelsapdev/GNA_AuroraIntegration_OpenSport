@@ -1,6 +1,7 @@
 ﻿// Domain/Entities/Schema/UserFieldDefinition.cs
 using GNA.AuroraIntegration.Domain.Enums;
 using GNA.AuroraIntegration.Domain.Enums.Schema;
+using System.ComponentModel;
 
 namespace GNA.AuroraIntegration.Domain.Entities.Schema;
 
@@ -15,6 +16,8 @@ public sealed class UserFieldDefinition
     public int? Size { get; }
     public UserFieldSubType SubType { get; }
     public string? LinkedTable { get; }
+    public List<ValidValueDefinition>? ValidValues { get; }
+    public string? DefaultValue { get; }
 
     public UserFieldDefinition(
         string name,
@@ -22,7 +25,9 @@ public sealed class UserFieldDefinition
         UserFieldType type,
         UserFieldSubType subType = UserFieldSubType.None,
         int? size = null,
-        string? linkedTable = null)
+        string? linkedTable = null,
+        List<ValidValueDefinition>? validValues = null, 
+        string? defaultValue = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Name no puede ser vacío.", nameof(name));
@@ -33,5 +38,20 @@ public sealed class UserFieldDefinition
         SubType = subType;
         Size = size;
         LinkedTable = linkedTable;
+        ValidValues = validValues;
+        DefaultValue = defaultValue;
+    }
+
+    public sealed class ValidValueDefinition
+    {
+        public string Value { get; }
+        public string Description { get; }
+        public ValidValueDefinition(string value, string description)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Value no puede ser vacío.", nameof(value));
+            Value = value;
+            Description = description;
+        }
     }
 }

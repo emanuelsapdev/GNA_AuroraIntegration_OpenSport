@@ -1,4 +1,4 @@
-namespace GNA.AuroraIntegration.Application.UseCases.Outbound;
+namespace GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 
 public interface IArticleSyncUseCase
 {

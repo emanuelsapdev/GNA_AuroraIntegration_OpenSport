@@ -74,7 +74,9 @@ public sealed class ServiceLayerSchemaProvisioningService : ISchemaProvisioningS
                 Type        = UserFieldTypeMapper.ToServiceLayerLiteral(field.Type),
                 SubType     = UserFieldSubTypeMapper.ToServiceLayerLiteral(field.SubType),
                 Size        = field.Size,
-                LinkedTable = field.LinkedTable
+                LinkedTable = field.LinkedTable,
+                ValidValuesMD = field.ValidValues,
+                DefaultValue = field.DefaultValue
             }, ct);
 
             _logger.LogInformation("UDF '{Field}' creado en '{Table}'.", field.Name, tableName);

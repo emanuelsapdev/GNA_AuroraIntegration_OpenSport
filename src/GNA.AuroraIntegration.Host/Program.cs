@@ -14,6 +14,7 @@ using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Repositories;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Services;
 using Quartz;
 using Serilog;
+using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 

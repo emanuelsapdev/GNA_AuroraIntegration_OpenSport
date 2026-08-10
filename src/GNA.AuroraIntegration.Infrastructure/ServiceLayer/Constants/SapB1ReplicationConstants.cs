@@ -20,20 +20,20 @@ internal static class SapB1ReplicationConstants
     /// <summary>Campo descripción estándar de UDTs.</summary>
     public const string NameField = "Name";
 
-    // ── @GNA_REP_QUEUE ───────────────────────────────────────────────────────
+    // ── @GNA_AUR_REP_QUEUE ───────────────────────────────────────────────────────
 
     /// <summary>Constantes para la UDT de cola de replicación.</summary>
     public static class Queue
     {
-        /// <summary>Endpoint Service Layer: /U_GNA_REP_QUEUE</summary>
-        public const string Endpoint = "U_GNA_REP_QUEUE";
+        /// <summary>Endpoint Service Layer: /U_GNA_AUR_REP_QUEUE</summary>
+        public const string Endpoint = "U_GNA_AUR_REP_QUEUE";
 
         // Campos (prefijo U_ obligatorio en Service Layer)
-        public const string EntityType = "U_EntityType";
-        public const string EntityKey  = "U_EntityKey";
-        public const string Operation  = "U_Operation";
-        public const string Status     = "U_Status";
-        public const string RetryCount = "U_RetryCount";
+        public const string EntityType = "U_GNA_AUR_EntityType";
+        public const string EntityKey  = "U_GNA_AUR_EntityKey";
+        public const string Operation  = "U_GNA_AUR_Operation";
+        public const string Status     = "U_GNA_AUR_Status";
+        public const string RetryCount = "U_GNA_AUR_RetryCount";
 
         /// <summary>Valores posibles del campo U_Status.</summary>
         public static class StatusValues
@@ -68,12 +68,12 @@ internal static class SapB1ReplicationConstants
     public static class Attempt
     {
         /// <summary>Endpoint Service Layer: /U_GNA_REP_ATTEMPT</summary>
-        public const string Endpoint = "U_GNA_REP_ATTEMPT";
+        public const string Endpoint = "U_GNA_AUR_REP_ATTEMPT";
 
-        public const string EntityType = "U_EntityType";
-        public const string EntityKey  = "U_EntityKey";
-        public const string Message    = "U_Message";
-        public const string CreatedAt  = "U_CreatedAt";
+        public const string EntityType = "U_GNA_AUR_EntityType";
+        public const string EntityKey  = "U_GNA_AUR_EntityKey";
+        public const string Message    = "U_GNA_AUR_Message";
+        public const string CreatedAt  = "U_GNA_AUR_CreatedAt";
 
         public const int MessageMaxLength = 254;
     }

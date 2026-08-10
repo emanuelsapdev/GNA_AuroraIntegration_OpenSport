@@ -9,8 +9,8 @@ namespace GNA.AuroraIntegration.Application.UseCases;
 
 /// <summary>
 /// Garantiza al arranque que existan las tablas compartidas de replicación:
-/// @GNA_REP_QUEUE (estado vivo de cada entidad pendiente) y
-/// @GNA_REP_ATTEMPT (histórico de intentos), usadas por todas las entidades
+/// @GNA_AUR_REP_QUEUE (estado vivo de cada entidad pendiente) y
+/// @GNA_AUR_REP_ATTEMPT (histórico de intentos), usadas por todas las entidades
 /// replicables mediante el discriminador EntityType.
 /// </summary>
 public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUseCase
@@ -132,6 +132,23 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
             new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.ProductBrand, "Marca de Producto", UserFieldType.Alpha, size: 30, linkedTable: ReplicationSchemaConstants.ProductBrandsTable.Name), ct);
+
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
+            new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.IsBulky, "Es Voluminoso?", UserFieldType.Alpha, size: 1, validValues: new List<UserFieldDefinition.ValidValueDefinition>
+            {
+                new UserFieldDefinition.ValidValueDefinition("Y", "Yes"),
+                new UserFieldDefinition.ValidValueDefinition("N", "No")
+            },defaultValue: "N"), ct);
+
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
+            new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.IsCaged, "Es Enjaulado?", UserFieldType.Alpha, size: 1, validValues: new List<UserFieldDefinition.ValidValueDefinition>
+            {
+                new UserFieldDefinition.ValidValueDefinition("Y", "Yes"),
+                new UserFieldDefinition.ValidValueDefinition("N", "No")
+            }, defaultValue: "N"), ct);
+
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
+           new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.Banner, "Banner", UserFieldType.Alpha, size: 150), ct);
 
     }
 }

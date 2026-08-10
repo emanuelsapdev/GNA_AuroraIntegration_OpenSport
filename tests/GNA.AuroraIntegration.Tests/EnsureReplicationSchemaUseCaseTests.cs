@@ -25,10 +25,10 @@ public class EnsureReplicationSchemaUseCaseTests
         _output = output;
     }
 
-    [Fact(DisplayName = "✓ Debe crear la tabla GNA_REP_QUEUE con los paranmetros esperados.")]
+    [Fact(DisplayName = "✓ Debe crear la tabla GNA_AUR_REP_QUEUE con los parametros esperados.")]
     public async Task ExecuteAsync_ShouldCreateQueueTable()
     {
-        _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_REP_QUEUE");
+        _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_AUR_REP_QUEUE");
 
         // Arrange
         var ct = CancellationToken.None;
@@ -46,13 +46,13 @@ public class EnsureReplicationSchemaUseCaseTests
                 ct),
             Times.Once);
 
-        _output.WriteLine("✅ ÉXITO: Tabla GNA_REP_QUEUE creada correctamente");
+        _output.WriteLine("✅ ÉXITO: Tabla GNA_AUR_REP_QUEUE creada correctamente");
     }
 
-    [Fact(DisplayName = "✓ Debe crear los campos en la tabla GNA_REP_QUEUE.")]
+    [Fact(DisplayName = "✓ Debe crear los campos en la tabla GNA_AUR_REP_QUEUE.")]
     public async Task ExecuteAsync_ShouldCreateQueueTableFields()
     {
-        _output.WriteLine("🔄 INICIO: Validando campos en tabla GNA_REP_QUEUE");
+        _output.WriteLine("🔄 INICIO: Validando campos en tabla GNA_AUR_REP_QUEUE");
 
         // Arrange
         var ct = CancellationToken.None;
@@ -100,13 +100,13 @@ public class EnsureReplicationSchemaUseCaseTests
                 ct),
             Times.Once);
 
-        _output.WriteLine("✅ ÉXITO: Todos los campos de GNA_REP_QUEUE creados correctamente");
+        _output.WriteLine("✅ ÉXITO: Todos los campos de GNA_AUR_REP_QUEUE creados correctamente");
     }
 
-    [Fact(DisplayName = "✓ Debe crear la tabla GNA_REP_ATTEMPT con los parámetros esperados.")]
+    [Fact(DisplayName = "✓ Debe crear la tabla GNA_AUR_REP_ATTEMPT con los parámetros esperados.")]
     public async Task ExecuteAsync_ShouldCreateAttemptTable()
     {
-        _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_REP_ATTEMPT");
+        _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_AUR_REP_ATTEMPT");
 
         // Arrange
         var ct = CancellationToken.None;
@@ -127,10 +127,10 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Tabla GNA_REP_ATTEMPT creada correctamente");
     }
 
-    [Fact(DisplayName = "✓ Campo RetryCount debe crearse en GNA_REP_QUEUE con tipo Numeric")]
+    [Fact(DisplayName = "✓ Campo RetryCount debe crearse en GNA_AUR_REP_QUEUE con tipo Numeric")]
     public async Task ExecuteAsync_ShouldCreateRetryCountFieldInQueue()
     {
-        _output.WriteLine("🔄 INICIO: Validando campo RetryCount en GNA_REP_QUEUE");
+        _output.WriteLine("🔄 INICIO: Validando campo RetryCount en GNA_AUR_REP_QUEUE");
 
         // Arrange
         var ct = CancellationToken.None;
@@ -320,14 +320,14 @@ public class EnsureReplicationSchemaUseCaseTests
         await _useCase.ExecuteAsync(ct);
 
         // Assert
-        // 4 tablas + 11 campos + 2 objetos usuario = 17 operaciones totales
+        // 4 tablas + 14 campos + 2 objetos usuario = 20 operaciones totales
         // - QueueTable: 1 tabla + 5 campos
         // - AttemptTable: 1 tabla + 4 campos
         // - LogisticsCategoryTable: 1 tabla + 1 user object
         // - ProductBrandsTable: 1 tabla + 1 user object
-        // - ItemsTable: 2 campos
+        // - ItemsTable: 5 campos
         _output.WriteLine("📊 Total de operaciones ejecutadas: {0}", totalOperations);
-        Assert.Equal(17, totalOperations);
+        Assert.Equal(20, totalOperations);
         _output.WriteLine("✅ ÉXITO: Número de operaciones es correcto");
     }
 

@@ -1,4 +1,4 @@
-﻿using GNA.AuroraIntegration.Application.UseCases.Outbound;
+﻿using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 using Quartz;
 
 namespace GNA.AuroraIntegration.Host.Jobs;

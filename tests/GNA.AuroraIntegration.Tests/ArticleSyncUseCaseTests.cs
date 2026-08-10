@@ -155,13 +155,18 @@ public sealed class ArticleSyncUseCaseTests
         Name = $"Artículo {sku}",
         PrimaryEan = "1234567890123",
         AdditionalEans = [],
-        WeightInGr = 100,
-        HeightInCm = 10,
-        WidthInCm = 5,
-        LengthInCm = 20,
-        IsConsumable = false,
-        HasProductionBatch = false,
-        HasDueDate = false,
-        HasSerialNumber = false
+        CategoryName = "Categoría de prueba",
+        BrandID = "MarcaDePrueba",
+        BannerID = "BannerDePrueba",
+        IsBulky = false,
+        IsCaged = false
+        //WeightInGr = 100,
+        //HeightInCm = 10,
+        //WidthInCm = 5,
+        //LengthInCm = 20,
+        //IsConsumable = false,
+        //HasProductionBatch = false,
+        //HasDueDate = false,
+        //HasSerialNumber = false
     };
 }

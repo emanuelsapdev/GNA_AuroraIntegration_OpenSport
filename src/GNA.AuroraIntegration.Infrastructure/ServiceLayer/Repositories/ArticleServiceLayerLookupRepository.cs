@@ -1,6 +1,8 @@
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Entities;
 using GNA.AuroraIntegration.Domain.Interfaces;
+using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Constants;
+using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Mapping;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
 
@@ -30,7 +32,7 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
     public async Task<Article?> GetBySkuAsync(string sku, CancellationToken ct = default)
     {
         var escapedSku = EscapeODataValue(sku);
-        var item = await _client.GetAsync<ServiceLayerItemDto>($"Items('{escapedSku}')", ct);
+        var item = await _client.GetAsync<ServiceLayerItemDto>($"{SapB1ItemsConstants.Items.Endpoint}('{escapedSku}')", ct);
 
         return item is null ? null : MapToArticle(item);
     }
@@ -49,8 +51,17 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
             var filter = string.Join(" or ",
                 batch.Select(sku => $"ItemCode eq '{EscapeODataValue(sku)}'"));
 
-            var resource = $"Items?$filter={filter}" +
-                            "&$select=ItemCode,ItemName,BarCode";
+            string fields = $"{SapB1ItemsConstants.Items.ItemCodeField}," +
+                            $"{SapB1ItemsConstants.Items.ItemNameField}," +
+                            $"{SapB1ItemsConstants.Items.BarCodeField}," +
+                            $"{SapB1ItemsConstants.Items.BannerIDField}," +
+                            $"{SapB1ItemsConstants.Items.BrandIDField}," +
+                            $"{SapB1ItemsConstants.Items.CategoryNameField}," +
+                            $"{SapB1ItemsConstants.Items.IsBulkyField}," +
+                            $"{SapB1ItemsConstants.Items.IsCagedField}";
+
+            var resource = $"{SapB1ItemsConstants.Items.Endpoint}?$filter={filter}" +
+                            $"&$select={fields}";
 
             var response = await _client.GetAsync<ServiceLayerCollectionDto<ServiceLayerItemDto>>(resource, ct);
 
@@ -71,7 +82,16 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
     /// ⚠️ Ajustar según la forma real de Article.cs.
     /// </summary>
     private static Article MapToArticle(ServiceLayerItemDto dto)
-        => new Article { Sku = dto.ItemCode, Name = dto.ItemName, PrimaryEan = dto.BarCode, AdditionalEans = [ dto.BarCode ] };
+        => new Article { 
+            Sku = dto.ItemCode, 
+            Name = dto.ItemName, 
+            PrimaryEan = dto.BarCode, 
+            BannerID = dto.BannerID, 
+            BrandID = dto.BrandID, 
+            CategoryName = dto.CategoryName,
+            IsBulky = dto.IsBulky == "Y",
+            IsCaged = dto.IsCaged == "Y"
+        };
 
     private static string EscapeODataValue(string value) => value.Replace("'", "''");
 
@@ -87,7 +107,13 @@ internal sealed class ServiceLayerItemDto
 {
     public string ItemCode { get; set; } = default!;
     public string ItemName { get; set; } = default!;
-    public string? BarCode { get; set; }
+    public string BarCode { get; set; } = default!;
+    public string? BannerID { get; set; }
+    public string? BrandID { get; set; }
+    public string? CategoryName { get; set; }
+    public string? IsBulky { get; set; }
+    public string? IsCaged { get; set; }
+
 }
 
 /// <summary>Envoltorio genérico de colección OData de Service Layer.</summary>

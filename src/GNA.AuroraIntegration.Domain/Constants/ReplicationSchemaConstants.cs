@@ -19,46 +19,46 @@ public static class ReplicationSchemaConstants
     public static class QueueTable
     {
         /// <summary>Nombre de la tabla sin prefijo '@' (requerido por UserTablesMD en SL).</summary>
-        public const string Name = "GNA_REP_QUEUE" + sufix;
+        public const string Name = "GNA_AUR_REP_QUEUE" + sufix;
 
         /// <summary>Nombre físico en SAP B1 HANA/SQL Server (con prefijo '@').</summary>
-        public const string DbName = "@GNA_REP_QUEUE" + sufix;
+        public const string DbName = "@GNA_AUR_REP_QUEUE" + sufix;
 
-        public const string Description = "Cola de replicación a Aurora";
+        public const string Description = "Cola de replicación (Aurora)";
 
         /// <summary>Nombres lógicos de los campos (sin prefijo 'U_').</summary>
         public static class Fields
         {
-            public const string EntityType = "EntityType";
-            public const string EntityKey  = "EntityKey";
-            public const string Operation  = "Operation";
-            public const string Status     = "Status";
-            public const string RetryCount = "RetryCount";
+            public const string EntityType = "GNA_AUR_EntityType";
+            public const string EntityKey  = "GNA_AUR_EntityKey";
+            public const string Operation  = "GNA_AUR_Operation";
+            public const string Status     = "GNA_AUR_Status";
+            public const string RetryCount = "GNA_AUR_RetryCount";
         }
     }
 
     /// <summary>Tabla de intentos: histórico inmutable de cada intento de replicación.</summary>
     public static class AttemptTable
     {
-        public const string Name = "GNA_REP_ATTEMPT" + sufix;
+        public const string Name = "GNA_AUR_REP_ATTEMPT" + sufix;
 
-        public const string DbName = "@GNA_REP_ATTEMPT" + sufix;
+        public const string DbName = "@GNA_AUR_REP_ATTEMPT" + sufix;
 
-        public const string Description = "Intentos de replicación";
+        public const string Description = "Intentos replicación (Aurora)";
 
         public static class Fields
         {
-            public const string EntityType = "EntityType";
-            public const string EntityKey  = "EntityKey";
-            public const string Message    = "Message";
-            public const string CreatedAt  = "CreatedAt";
+            public const string EntityType = "GNA_AUR_EntityType";
+            public const string EntityKey  = "GNA_AUR_EntityKey";
+            public const string Message    = "GNA_AUR_Message";
+            public const string CreatedAt  = "GNA_AUR_CreatedAt";
         }
     }
 
     public static class LogisticsCategoryTable
     {
-        public const string Name = "GN_CATLOG" + sufix;
-        public const string DbName = "@GN_CATLOG" + sufix;
+        public const string Name = "GNA_AUR_CATLOG" + sufix;
+        public const string DbName = "@GNA_AUR_CATLOG" + sufix;
         public const string Description = "Categorías Logísticas";
     }
 
@@ -70,14 +70,14 @@ public static class ReplicationSchemaConstants
         public const int FatherMenuID = 11520; 
         public const int Position = 14;
         public const string MenuUID = "CatLog" + sufix;
-        public const string TableName = "GN_CATLOG" + sufix;
+        public const string TableName = "GNA_AUR_CATLOG" + sufix;
 
     }
 
     public static class ProductBrandsTable
     {
-        public const string Name = "GN_MARCAS" + sufix;
-        public const string DbName = "@GN_MARCAS" + sufix;
+        public const string Name = "GNA_AUR_MARCAS" + sufix;
+        public const string DbName = "@GNA_AUR_MARCAS" + sufix;
         public const string Description = "Marcas de Productos";
 
     }
@@ -90,7 +90,7 @@ public static class ReplicationSchemaConstants
         public const int FatherMenuID = 11520;
         public const int Position = 15;
         public const string MenuUID = "Marcas" + sufix;
-        public const string TableName = "GN_MARCAS" + sufix;
+        public const string TableName = "GNA_AUR_MARCAS" + sufix;
 
     }
 
@@ -102,8 +102,11 @@ public static class ReplicationSchemaConstants
 
         public static class Fields
         {
-            public const string LogisticsCategory = "GN_CatLog" + sufix;
-            public const string ProductBrand = "GN_Marca" + sufix;
+            public const string LogisticsCategory = "GNA_AUR_CatLog" + sufix;
+            public const string ProductBrand = "GNA_AUR_Marca" + sufix;
+            public const string IsBulky = "GNA_AUR_IsBulky" + sufix;
+            public const string IsCaged = "GNA_AUR_IsCaged" + sufix;
+            public const string Banner = "GNA_AUR_Banner" + sufix;
         }
     }
 }

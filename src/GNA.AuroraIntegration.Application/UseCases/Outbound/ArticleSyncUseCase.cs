@@ -1,5 +1,6 @@
 ﻿using GNA.AuroraIntegration.Application.DTOs.Aurora;
 using GNA.AuroraIntegration.Application.Interfaces;
+using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 using GNA.AuroraIntegration.Application.Validation;
 using GNA.AuroraIntegration.Domain.Entities;
 using GNA.AuroraIntegration.Domain.Interfaces;
@@ -100,22 +101,11 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Name = article.Name,
         Ean = article.PrimaryEan,
         Eans = MapEans(article.AdditionalEans),
-        BrandName = article.BrandName,
+        //BrandExternalId = article.BrandID,
         CategoryName = article.CategoryName,
-        BannerName = string.Empty,
-        BannerExternalId = string.Empty,
-        WeightInGr = (double?)article.WeightInGr,
-        HeightInCm = (double?)article.HeightInCm,
-        WidthInCm = (double?)article.WidthInCm,
-        LengthInCm = (double?)article.LengthInCm,
-        IsConsumable = article.IsConsumable,
-        HasProductionBatch = article.HasProductionBatch,
-        HasDueDate = article.HasDueDate,
-        HasSerialNumber = article.HasSerialNumber,
-        Colour = article.Colour,
-        Bulky = false,
-        Cage = false,
-        Size = article.Size
+        BannerExternalId = article.BannerID,
+        Bulky = article.IsBulky,
+        Cage = article.IsCaged
     };
 
     private static UpdateAuroraArticleDto MapToUpdateArticle(Article article) => new()
@@ -123,21 +113,10 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Sku = article.Sku,
         Name = article.Name,
         Eans = MapEans(article.AdditionalEans),
-        BrandName = article.BrandName,
+        //BrandExternalId = article.BrandID,
         CategoryName = article.CategoryName,
-        BannerName = string.Empty,
-        BannerExternalId = string.Empty,
-        WeightInGr = (double?)article.WeightInGr,
-        HeightInCm = (double?)article.HeightInCm,
-        WidthInCm = (double?)article.WidthInCm,
-        LengthInCm = (double?)article.LengthInCm,
-        IsConsumable = article.IsConsumable,
-        HasProductionBatch = article.HasProductionBatch,
-        HasDueDate = article.HasDueDate,
-        HasSerialNumber = article.HasSerialNumber,
-        Colour = article.Colour,
-        Bulky = false,
-        Cage = false,
-        Size = article.Size
+        BannerExternalId = article.BannerID, 
+        Bulky = article.IsBulky,
+        Cage = article.IsCaged
     };
 }

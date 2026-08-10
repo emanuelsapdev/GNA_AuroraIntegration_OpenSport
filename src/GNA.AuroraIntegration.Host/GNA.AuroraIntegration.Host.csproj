@@ -23,6 +23,7 @@
 
 	<ItemGroup>
 		<Folder Include="Endpoints\" />
+		<Folder Include="logs\" />
 	</ItemGroup>
 
 	<Target Name="RunTestsBeforeBuild" BeforeTargets="Build">
