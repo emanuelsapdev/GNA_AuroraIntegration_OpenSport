@@ -177,7 +177,7 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
             }, defaultValue: "N"), ct);
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
-           new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.Banner, "Banner", UserFieldType.Alpha, size: 150), ct);
+           new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.Banner, "Banner", UserFieldType.Alpha, size: 30, linkedTable: ReplicationSchemaConstants.BannersTable.Name), ct);
 
     }
 }
