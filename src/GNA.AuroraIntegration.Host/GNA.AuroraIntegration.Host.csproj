@@ -1,6 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<ItemGroup>
+	  <Compile Remove="Endpoints\**" />
+	  <Content Remove="Endpoints\**" />
+	  <EmbeddedResource Remove="Endpoints\**" />
+	  <None Remove="Endpoints\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\GNA.AuroraIntegration.Infrastructure\GNA.AuroraIntegration.Infrastructure.csproj" />
 		<ProjectReference Include="..\GNA.AuroraIntegration.Application\GNA.AuroraIntegration.Application.csproj" />
 	</ItemGroup>
@@ -22,7 +29,6 @@
   </PropertyGroup>
 
 	<ItemGroup>
-		<Folder Include="Endpoints\" />
 		<Folder Include="logs\" />
 	</ItemGroup>
 
