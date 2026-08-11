@@ -28,6 +28,7 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
         await EnsureAttemptTableAsync(ct);
         await EnsureLogisticsCategoryTableAsync(ct);
         await EnsureProductBrandsTableAsync(ct);
+        await EnsureBannersTableAsync(ct);
         await EnsureArticlesFieldsAsync(ct);
     }
 
@@ -123,6 +124,34 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
             objectType: UserObjectType.MasterData);
         await _schema.EnsureUserObjectAsync(productBrandsUserObject, ct);
 
+    }
+
+    /// <summary>
+    /// Tabla de Banners: solo utiliza los campos Code/Name que trae por defecto toda UDT
+    /// MasterData en SAP B1 — no se agregan UDFs adicionales sobre ella.
+    /// </summary>
+    private async Task EnsureBannersTableAsync(CancellationToken ct)
+    {
+        var bannersTable = new UserTableDefinition(
+            ReplicationSchemaConstants.BannersTable.Name,
+            ReplicationSchemaConstants.BannersTable.Description,
+            UserTableType.MasterData);
+        await _schema.EnsureUserTableAsync(bannersTable, ct);
+
+        var bannersUserObject = new UserObjectDefinition(
+            code: ReplicationSchemaConstants.BannersUserObject.Code,
+            name: ReplicationSchemaConstants.BannersUserObject.Name,
+            tableName: ReplicationSchemaConstants.BannersUserObject.TableName,
+            canClose: true,
+            canFind: true,
+            menuItem: true,
+            menuCaption: ReplicationSchemaConstants.BannersUserObject.MenuCaption,
+            fatherMenuID: ReplicationSchemaConstants.BannersUserObject.FatherMenuID,
+            position: ReplicationSchemaConstants.BannersUserObject.Position,
+            menuUID: ReplicationSchemaConstants.BannersUserObject.MenuUID,
+            canCreateDefaultForm: true,
+            objectType: UserObjectType.MasterData);
+        await _schema.EnsureUserObjectAsync(bannersUserObject, ct);
     }
 
     private async Task EnsureArticlesFieldsAsync(CancellationToken ct)

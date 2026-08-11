@@ -246,6 +246,75 @@ public class EnsureReplicationSchemaUseCaseTests
         _output.WriteLine("✅ ÉXITO: Objeto usuario para Marcas creado correctamente");
     }
 
+    [Fact(DisplayName = "✓ Debe crear la tabla GNA_AUR_BANNERS (Banners)")]
+    public async Task ExecuteAsync_ShouldCreateBannersTable()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de tabla GNA_AUR_BANNERS");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserTableAsync(
+                It.Is<UserTableDefinition>(t =>
+                    t.TableName == ReplicationSchemaConstants.BannersTable.Name &&
+                    t.TableDescription == ReplicationSchemaConstants.BannersTable.Description &&
+                    t.TableType == UserTableType.MasterData),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Tabla GNA_AUR_BANNERS creada correctamente");
+    }
+
+    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Banners")]
+    public async Task ExecuteAsync_ShouldCreateBannersUserObject()
+    {
+        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Banners");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert
+        _mockSchemaService.Verify(
+            x => x.EnsureUserObjectAsync(
+                It.Is<UserObjectDefinition>(o =>
+                    o.Code == ReplicationSchemaConstants.BannersUserObject.Code &&
+                    o.TableName == ReplicationSchemaConstants.BannersUserObject.TableName),
+                ct),
+            Times.Once);
+
+        _output.WriteLine("✅ ÉXITO: Objeto usuario para Banners creado correctamente");
+    }
+
+    [Fact(DisplayName = "✓ No debe crear campos (UDF) adicionales para GNA_AUR_BANNERS")]
+    public async Task ExecuteAsync_ShouldNotCreateExtraFieldsForBannersTable()
+    {
+        _output.WriteLine("🔄 INICIO: Validando que GNA_AUR_BANNERS no reciba UDFs adicionales");
+
+        // Arrange
+        var ct = CancellationToken.None;
+
+        // Act
+        await _useCase.ExecuteAsync(ct);
+
+        // Assert - la tabla de Banners solo usa Code/Name por defecto, nunca se le agregan UDFs.
+        _mockSchemaService.Verify(
+            x => x.EnsureUserFieldAsync(
+                ReplicationSchemaConstants.BannersTable.DbName,
+                It.IsAny<UserFieldDefinition>(),
+                ct),
+            Times.Never);
+
+        _output.WriteLine("✅ ÉXITO: GNA_AUR_BANNERS no recibió UDFs adicionales");
+    }
+
     [Fact(DisplayName = "✓ Debe crear campos de Categoría Logística y Marca en OITM")]
     public async Task ExecuteAsync_ShouldCreateArticlesFields()
     {
@@ -320,14 +389,15 @@ public class EnsureReplicationSchemaUseCaseTests
         await _useCase.ExecuteAsync(ct);
 
         // Assert
-        // 4 tablas + 14 campos + 2 objetos usuario = 20 operaciones totales
+        // 5 tablas + 14 campos + 3 objetos usuario = 22 operaciones totales
         // - QueueTable: 1 tabla + 5 campos
         // - AttemptTable: 1 tabla + 4 campos
         // - LogisticsCategoryTable: 1 tabla + 1 user object
         // - ProductBrandsTable: 1 tabla + 1 user object
+        // - BannersTable: 1 tabla + 1 user object (sin campos adicionales, solo Code/Name por defecto)
         // - ItemsTable: 5 campos
         _output.WriteLine("📊 Total de operaciones ejecutadas: {0}", totalOperations);
-        Assert.Equal(20, totalOperations);
+        Assert.Equal(22, totalOperations);
         _output.WriteLine("✅ ÉXITO: Número de operaciones es correcto");
     }
 

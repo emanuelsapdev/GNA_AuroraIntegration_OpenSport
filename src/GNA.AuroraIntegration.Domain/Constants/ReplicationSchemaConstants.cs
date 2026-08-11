@@ -94,6 +94,26 @@ public static class ReplicationSchemaConstants
 
     }
 
+    /// <summary>Tabla de Banners. Solo usa los campos Code/Name que trae por defecto toda UDT
+    /// MasterData — no se provisionan UDFs adicionales sobre ella.</summary>
+    public static class BannersTable
+    {
+        public const string Name = "GNA_AUR_BANNERS" + sufix;
+        public const string DbName = "@GNA_AUR_BANNERS" + sufix;
+        public const string Description = "Banners";
+    }
+
+    public static class BannersUserObject
+    {
+        public const string Code = "Banners" + sufix;
+        public const string Name = "Banners" + sufix;
+        public const string MenuCaption = "Banners" + sufix;
+        public const int FatherMenuID = 11520;
+        public const int Position = 16;
+        public const string MenuUID = "Banners" + sufix;
+        public const string TableName = "GNA_AUR_BANNERS" + sufix;
+    }
+
     public static class ItemsTable
     {
         public const string Name = "OITM";
