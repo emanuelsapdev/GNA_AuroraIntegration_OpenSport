@@ -48,12 +48,14 @@ internal static class SapB1ReplicationConstants
         {
             public const int Article = 4;
             public const int PurchaseOrder = 4;
+            public const int TransferOutOrder = 4;
         }
 
         public static class ExcludedStatuses
         {
             public static readonly string[] Article = new[] { StatusValues.Replicated };
             public static readonly string[] PurchaseOrder = new[] { StatusValues.Replicated };
+            public static readonly string[] TransferOutOrder = new[] { StatusValues.Replicated };
         }
 
         /// <summary>Valores posibles del campo U_Operation.</summary>

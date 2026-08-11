@@ -47,9 +47,14 @@ builder.Services.AddScoped<IArticleLookupRepository, ArticleServiceLayerLookupRe
 builder.Services.AddScoped<IArticleReplicationRepository, ArticleReplicationRepository>();
 builder.Services.AddScoped<IPurchaseOrderLookupRepository, PurchaseOrderServiceLayerLookupRepository>();
 builder.Services.AddScoped<IPurchaseOrderReplicationRepository, PurchaseOrderReplicationRepository>();
+builder.Services.AddScoped<IInventoryTransferRequestLookupRepository, InventoryTransferRequestServiceLayerLookupRepository>();
+builder.Services.AddScoped<ITransferOutOrderReplicationRepository, TransferOutOrderReplicationRepository>();
 
 // Singleton: AuroraPurchaseOrderApiClient gestiona internamente su RestClient (misma convención que AuroraArticleApiClient)
 builder.Services.AddSingleton<IAuroraPurchaseOrderApiClient, AuroraPurchaseOrderApiClient>();
+
+// Singleton: AuroraTransferOutOrderApiClient gestiona internamente su RestClient (misma convención que AuroraPurchaseOrderApiClient)
+builder.Services.AddSingleton<IAuroraTransferOutOrderApiClient, AuroraTransferOutOrderApiClient>();
 
 // Agregar repositorios y casos de uso
 builder.Services.AddScoped<IEnsureReplicationSchemaUseCase, EnsureReplicationSchemaUseCase>();
@@ -60,6 +65,10 @@ builder.Services.Decorate<IArticleSyncUseCase, ArticleSyncUseCaseLoggingDecorato
 builder.Services.AddScoped<IPurchaseOrderPayloadValidator, PurchaseOrderPayloadValidator>();
 builder.Services.AddScoped<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCase>();
 builder.Services.Decorate<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCaseLoggingDecorator>();
+
+builder.Services.AddScoped<ITransferOutOrderPayloadValidator, TransferOutOrderPayloadValidator>();
+builder.Services.AddScoped<ITransferOutOrderSyncUseCase, TransferOutOrderSyncUseCase>();
+builder.Services.Decorate<ITransferOutOrderSyncUseCase, TransferOutOrderSyncUseCaseLoggingDecorator>();
 
 // ---- Bootstrap de esquema: SIEMPRE antes de Quartz ----
 builder.Services.AddHostedService<SchemaBootstrapperHostedService>(); // DESCOMENTAR 
@@ -78,6 +87,12 @@ builder.Services.AddQuartz(q =>
     q.AddTrigger(t => t.ForJob(purchaseOrdersJobKey)
         .WithIdentity("PurchaseOrdersSyncJob-trigger")
         .WithCronSchedule(builder.Configuration["Jobs:PurchaseOrdersSyncJob:Cron"]!));
+
+    var transferOutOrdersJobKey = new JobKey("TransferOutOrdersSyncJob");
+    q.AddJob<TransferOutOrdersSyncJob>(opts => opts.WithIdentity(transferOutOrdersJobKey));
+    q.AddTrigger(t => t.ForJob(transferOutOrdersJobKey)
+        .WithIdentity("TransferOutOrdersSyncJob-trigger")
+        .WithCronSchedule(builder.Configuration["Jobs:TransferOutOrdersSyncJob:Cron"]!));
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

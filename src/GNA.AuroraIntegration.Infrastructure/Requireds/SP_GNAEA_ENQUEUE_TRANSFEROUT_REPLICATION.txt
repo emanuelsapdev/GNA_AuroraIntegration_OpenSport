@@ -1,0 +1,64 @@
+ALTER PROCEDURE SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+    OUT error_code    INT,
+    OUT error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+    -- ⚠️⚠️⚠️ object_type '67' = Solicitud de Traslado (Inventory Transfer Request / OWTQ) — VALOR
+    -- NO VERIFICADO. A diferencia de '22' (Purchase Order, confirmado y en producción), este
+    -- valor es un placeholder que el usuario indicó explícitamente que ajustará él mismo antes
+    -- de llevar esto a producción ("Despues yo lo ajusto"). NO tratar este valor como
+    -- confirmado bajo ningún concepto — verificar contra OBJT/document_type real del ambiente
+    -- (o la constante BoObjectTypes.oInventoryTransferRequest del DI API) antes de habilitar
+    -- este SP en un Transaction Notification productivo.
+    -- Cubre Alta, Modificación y Cancelación (transaction_type 'A'/'U'/'C').
+	IF (:object_type = '67' AND :transaction_type IN ('A', 'U', 'C')) THEN
+
+		DECLARE v_exists  INT := 0;
+	    DECLARE v_code    NVARCHAR(50);
+		DECLARE v_doc_entry    NVARCHAR(255);
+		DECLARE v_operation    NVARCHAR(1);
+
+		-- El key de Solicitud de Traslado en Transaction Notification es DocEntry (columna única).
+		v_doc_entry := :list_of_cols_val_tab_del;
+
+		IF (:transaction_type = 'A') THEN
+			v_operation := 'I';
+		ELSEIF (:transaction_type = 'C') THEN
+			v_operation := 'C';
+		ELSE
+			v_operation := 'U';
+		END IF;
+
+	    -- Evitar encolar duplicados si ya hay un pendiente para esta orden. No importa si el
+	    -- pendiente existente quedó como 'I'/'U'/'C': el use case de C# (TransferOutOrderSyncUseCase)
+	    -- siempre relee el estado completo de la orden en SAP al procesar la cola (incluyendo el
+	    -- flag Cancelled), nunca aplica un delta — así que un solo registro PENDING alcanza,
+	    -- incluso si la cancelación llega después de que un alta/modificación ya haya quedado
+	    -- encolada sin procesarse todavía.
+	    SELECT COUNT(*) INTO v_exists
+	    FROM "@GNA_AUR_REP_QUEUE"
+	    WHERE "U_GNA_AUR_EntityType" = 'TransferOutOrder'
+	      AND "U_GNA_AUR_EntityKey"  = :v_doc_entry
+	      AND "U_GNA_AUR_Status"     = 'PENDING';
+
+	    IF :v_exists = 0 THEN
+	        v_code := 'TO-' || :v_doc_entry || '-' || TO_VARCHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS');
+
+	        INSERT INTO "@GNA_AUR_REP_QUEUE"
+	            ("Code", "Name", "U_GNA_AUR_EntityType", "U_GNA_AUR_EntityKey", "U_GNA_AUR_Operation", "U_GNA_AUR_Status", "U_GNA_AUR_RetryCount")
+	        VALUES
+	            (:v_code, :v_code, 'TransferOutOrder', :v_doc_entry, :v_operation, 'PENDING', 0);
+	    END IF;
+
+	    SELECT :error_code, :error_message FROM DUMMY;
+	    RETURN;
+    END IF;
+
+END;

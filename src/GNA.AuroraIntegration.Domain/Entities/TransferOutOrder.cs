@@ -1,0 +1,40 @@
+namespace GNA.AuroraIntegration.Domain.Entities;
+
+/// <summary>
+/// Representa una Solicitud de Traslado de SAP B1 (OWTQ/WTQ1, "Inventory Transfer Request")
+/// replicada hacia Aurora WMS como "transfer out order" (envíos a Sucursales). Entidad pura,
+/// sin dependencias del SDK de SAP ni de infraestructura.
+/// </summary>
+public sealed class TransferOutOrder
+{
+    /// <summary>
+    /// DocEntry de la Solicitud de Traslado en SAP B1. Es la clave natural utilizada como
+    /// EntityKey en la cola de replicación y como externalId al crear la orden en Aurora
+    /// (a diferencia de DocNum, DocEntry es inmutable y único independientemente de series/sucursales).
+    /// </summary>
+    public required int DocEntry { get; init; }
+
+    /// <summary>Número de documento visible al usuario en SAP B1 (informativo, no se usa como clave).</summary>
+    public int? DocNum { get; init; }
+
+    /// <summary>
+    /// true si la Solicitud de Traslado fue cancelada en SAP B1 (campo estándar OWTQ.Cancelled,
+    /// expuesto por Service Layer como "tYES"/"tNO"). TransferOutOrderSyncUseCase usa este flag
+    /// —no el Operation con el que quedó encolada la entrada— para decidir si corresponde
+    /// cancelar la orden en Aurora en lugar de crearla/reconciliarla.
+    /// </summary>
+    public bool Cancelled { get; init; }
+
+    // TODO (Etapa 1 - pendiente de definición de negocio): la documentación de Aurora no marca
+    // bannerExternalId/logisticOperatorExternalId/postalCode/shippingPriorityExternalId como
+    // opcionales en la creación de la orden (a diferencia de purchase-orders, donde bannerName/
+    // bannerExternalId sí lo son). No hay campo SAP mapeado hoy a ninguno de estos cuatro; se
+    // omiten en la replicación. ⚠️ Riesgo: si Aurora los exige realmente, el alta puede fallar
+    // con 400 — validar contra el ambiente de Aurora antes de pasar a producción.
+    public string? BannerName { get; init; }
+    public string? BannerExternalId { get; init; }
+
+    public string? Notes { get; init; }
+
+    public required IReadOnlyList<TransferOutOrderLine> Lines { get; init; }
+}

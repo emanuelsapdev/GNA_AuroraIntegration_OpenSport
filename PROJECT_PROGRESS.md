@@ -29,6 +29,17 @@ de forma programada (Quartz.NET) y expone endpoints mínimos de salud e ingesta 
 5. Marca la OC como `REPLICATED` o `FAILED` en la cola con historial en `@GNA_AUR_REP_ATTEMPT`.
 6. **Pendiente (backlog):** sincronización de campos de header (`bannerName`/`bannerExternalId`/`notes` — Aurora no expone endpoint para esto en `purchase-orders`), Reporte de ingreso (Aurora → SAP) y Aviso de cambio de estado (Aurora → SAP) — ver circuito completo en el doc del proyecto "Integración SAP B1 - Aurora Etapa1 CIRCUITOS".
 
+**Flujo central (Outbound) — Solicitudes de Traslado / Órdenes de Transferencia de Salida (Alta + Modificación de líneas + Cancelación):**
+1. SAP B1 enola una Solicitud de Traslado (DocEntry) en `@GNA_AUR_REP_QUEUE` con `EntityType = 'TransferOutOrder'`, disparado por `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION` (llamado desde `SBO_SP_TransactionNotification`, `object_type` **⚠️ NO VERIFICADO (placeholder '67')**, `transaction_type` `A`, `U` o `C`).
+2. El job de Quartz (`TransferOutOrdersSyncJob`) llama a `TransferOutOrderSyncUseCase`.
+3. El use case lee los DocEntry pendientes y obtiene la orden completa (header + `Cancelled` + `DocumentLines`) desde Service Layer (`InventoryTransferRequests` — **⚠️ nombre de recurso y campos de línea no verificados contra `$metadata`, asumidos análogos a `PurchaseOrders`/POR1**).
+4. Rama de decisión (por prioridad, mismo patrón que Órdenes de Compra):
+   - **`TransferOutOrder.Cancelled == true`** → cancela la orden en Aurora (`DELETE /aurora-erp/transfer-out-orders/{externalId}`), o no hace nada si nunca llegó a existir allí (no-op exitoso).
+   - **No cancelada y no existe en Aurora** (`GET /aurora-erp/transfer-out-orders/{externalId}`) → la crea completa con `POST /aurora-erp/transfer-out-orders`.
+   - **No cancelada y ya existe** → se **reconcilian las líneas** contra `GET .../articles`: edita las que cambiaron de cantidad (`PATCH .../articles/{sku}`) y elimina las que ya no están en SAP (`DELETE .../articles/{sku}`). Las líneas con `fulfilledQuantity > 0` en Aurora nunca se editan ni se eliminan (solo se loguea una advertencia). **⚠️ Diferencia clave con Órdenes de Compra: la API de Aurora NO expone alta de artículos sobre una orden de transferencia de salida existente (no hay `POST .../articles`) — las líneas nuevas en SAP se loguean como advertencia y se omiten, es una limitación real de la API, no una decisión de negocio.**
+5. Marca la orden como `REPLICATED` o `FAILED` en la cola con historial en `@GNA_AUR_REP_ATTEMPT`.
+6. **Pendiente (backlog):** ver sección "Entidad `TransferOutOrder`" para el detalle completo de limitaciones (PATCH de cabecera no invocado automáticamente, campos de creación sin mapeo SAP, `object_type` sin verificar).
+
 ---
 
 ## Stack técnico
@@ -73,6 +84,8 @@ src/
 │   │   ├── Article.cs                           ← entidad principal replicable
 │   │   ├── PurchaseOrder.cs                     ← header de OC (DocEntry, DocNum, banner*, notes, Lines)
 │   │   ├── PurchaseOrderLine.cs                 ← línea de OC (LineOrder, ArticleSku, Quantity)
+│   │   ├── TransferOutOrder.cs                  ← header de Solicitud de Traslado (DocEntry, DocNum, banner*, notes, Lines)
+│   │   ├── TransferOutOrderLine.cs              ← línea de Solicitud de Traslado (LineOrder, ArticleSku, Quantity)
 │   │   ├── LogisticsCategory.cs
 │   │   ├── ProductBrand.cs
 │   │   └── Schema/
@@ -98,12 +111,17 @@ src/
 │   │   ├── UseCaseValidationException.cs
 │   │   ├── PurchaseOrderAuroraApiException.cs
 │   │   ├── PurchaseOrderNotFoundException.cs
-│   │   └── PurchaseOrderRepositoryException.cs
+│   │   ├── PurchaseOrderRepositoryException.cs
+│   │   ├── TransferOutOrderAuroraApiException.cs
+│   │   ├── TransferOutOrderNotFoundException.cs
+│   │   └── TransferOutOrderRepositoryException.cs
 │   └── Interfaces/
 │       ├── IArticleLookupRepository.cs          ← leer Items de SAP B1
 │       ├── IArticleReplicationRepository.cs     ← cola específica de Article
 │       ├── IPurchaseOrderLookupRepository.cs    ← leer PurchaseOrders de SAP B1
 │       ├── IPurchaseOrderReplicationRepository.cs ← cola específica de PurchaseOrder
+│       ├── IInventoryTransferRequestLookupRepository.cs ← leer InventoryTransferRequests de SAP B1
+│       ├── ITransferOutOrderReplicationRepository.cs ← cola específica de TransferOutOrder
 │       ├── IReplicationControlStore.cs          ← store genérico de cola/intentos
 │       └── ISchemaProvisioningService.cs        ← provisionar UDTs/UDFs/UDOs
 
@@ -116,10 +134,16 @@ src/
 │   │   ├── CreateAuroraPurchaseOrderDto.cs      ← payload POST purchase-orders (con DataAnnotations)
 │   │   ├── PurchaseOrderArticleDto.cs           ← línea del payload (lineOrder/articleSku/quantity) — alta, add y edit de línea
 │   │   ├── PurchaseOrderArticleStateDto.cs      ← respuesta GET .../articles (requestedQuantity/fulfilledQuantity, clave para la reconciliación)
-│   │   └── AuroraPurchaseOrderDto.cs            ← respuesta GET purchase-orders/{externalId}
+│   │   ├── AuroraPurchaseOrderDto.cs            ← respuesta GET purchase-orders/{externalId}
+│   │   ├── CreateAuroraTransferOutOrderDto.cs   ← payload POST transfer-out-orders (con DataAnnotations)
+│   │   ├── UpdateAuroraTransferOutOrderDto.cs   ← payload PATCH transfer-out-orders/{externalId} (cabecera — no invocado automáticamente, ver Entidad TransferOutOrder)
+│   │   ├── TransferOutOrderArticleDto.cs        ← línea del payload (lineOrder/articleSku/quantity) — alta y edit de línea (NO add sobre orden existente)
+│   │   ├── TransferOutOrderArticleStateDto.cs   ← respuesta GET .../articles (requestedQuantity/fulfilledQuantity)
+│   │   └── AuroraTransferOutOrderDto.cs         ← respuesta GET transfer-out-orders/{externalId}
 │   ├── Interfaces/
 │   │   ├── IAuroraArticleApiClient.cs           ← contrato del cliente Aurora (Artículos)
 │   │   ├── IAuroraPurchaseOrderApiClient.cs     ← contrato del cliente Aurora (Órdenes de Compra: alta + add/edit/remove de líneas)
+│   │   ├── IAuroraTransferOutOrderApiClient.cs  ← contrato del cliente Aurora (Transferencias de Salida: alta + edit/remove de líneas, SIN add + PATCH de cabecera)
 │   │   └── IServiceLayerClient.cs               ← contrato del cliente Service Layer
 │   ├── UseCases/
 │   │   ├── EnsureReplicationSchemaUseCase.cs    ← provisiona UDTs/UDFs/UDOs al arrancar
@@ -127,37 +151,45 @@ src/
 │   │   └── Outbound/
 │   │       ├── ArticleSyncUseCase.cs            ← IMPLEMENTADO Y FUNCIONAL
 │   │       ├── PurchaseOrderSyncUseCase.cs      ← IMPLEMENTADO (Alta + reconciliación de líneas en Modificación)
+│   │       ├── TransferOutOrderSyncUseCase.cs   ← IMPLEMENTADO (Alta + reconciliación edit/remove en Modificación, SIN add de líneas nuevas)
 │   │       ├── LogisticsCategorySyncUseCase.cs  ← STUB (devuelve dummy values)
 │   │       ├── ProductBrandsSyncUseCase.cs      ← STUB (devuelve dummy values)
 │   │       ├── Decorators/
 │   │       │   ├── ArticleSyncUseCaseLoggingDecorator.cs
 │   │       │   ├── PurchaseOrderSyncUseCaseLoggingDecorator.cs
+│   │       │   ├── TransferOutOrderSyncUseCaseLoggingDecorator.cs
 │   │       │   ├── LogisticsCategorySyncUseCaseLoggingDecorator.cs
 │   │       │   └── ProductBrandsSyncUseCaseDecorator.cs
 │   │       └── Interfaces/
 │   │           ├── IArticleSyncUseCase.cs
 │   │           ├── IPurchaseOrderSyncUseCase.cs
+│   │           ├── ITransferOutOrderSyncUseCase.cs
 │   │           ├── ILogisticsCategorySyncUseCase.cs
 │   │           └── IProductBrandsSyncUseCase.cs
 │   └── Validation/
 │       ├── ArticlePayloadValidator.cs           ← valida DTOs de Aurora con DataAnnotations
 │       ├── IArticlePayloadValidator.cs
 │       ├── PurchaseOrderPayloadValidator.cs
-│       └── IPurchaseOrderPayloadValidator.cs
+│       ├── IPurchaseOrderPayloadValidator.cs
+│       ├── TransferOutOrderPayloadValidator.cs
+│       └── ITransferOutOrderPayloadValidator.cs
 
 ├── GNA.AuroraIntegration.Infrastructure/
 │   ├── Aurora/
 │   │   ├── AuroraApiSettings.cs                 ← BaseUrl, ApiKey, Warehouse (TODO: origen del valor)
 │   │   ├── AuroraArticleApiClient.cs            ← cliente HTTP Aurora Artículos (retry + circuit breaker)
-│   │   └── AuroraPurchaseOrderApiClient.cs      ← cliente HTTP Aurora Órdenes de Compra (ídem)
+│   │   ├── AuroraPurchaseOrderApiClient.cs      ← cliente HTTP Aurora Órdenes de Compra (ídem)
+│   │   └── AuroraTransferOutOrderApiClient.cs   ← cliente HTTP Aurora Transferencias de Salida (ídem, sin AddArticles + con UpdateHeader)
 │   ├── Repositories/
 │   │   ├── ArticleReplicationRepository.cs      ← adapta IArticleReplicationRepository sobre el store genérico
 │   │   ├── PurchaseOrderReplicationRepository.cs ← adapta IPurchaseOrderReplicationRepository sobre el store genérico
+│   │   ├── TransferOutOrderReplicationRepository.cs ← adapta ITransferOutOrderReplicationRepository sobre el store genérico
 │   │   └── ReplicationControlStore.cs           ← IReplicationControlStore sobre UDTs SAP B1
 │   ├── Requireds/
 │   │   ├── SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION.txt        ← SP HANA que encola artículos
 │   │   ├── SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION.txt  ← SP HANA que encola OC (solo Alta, object_type 22)
-│   │   └── SBO_SP_TransactionNotification.txt              ← hook SAP B1 que llama a ambos SP anteriores
+│   │   ├── SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION.txt    ← SP HANA que encola Solicitudes de Traslado (⚠️ object_type '67' NO VERIFICADO)
+│   │   └── SBO_SP_TransactionNotification.txt              ← hook SAP B1 que llama a los 3 SP anteriores
 │   └── ServiceLayer/
 │       ├── Client/
 │       │   ├── ServiceLayerClient.cs            ← cliente HTTP SL (session cookie B1SESSION, retry + CB)
@@ -167,6 +199,7 @@ src/
 │       │   ├── SapB1ProductBrandsConstants.cs   ← recurso U_GNA_AUR_MARCAS (Code/Name)
 │       │   ├── SapB1BannersConstants.cs         ← recurso U_GNA_AUR_BANNERS (Code/Name)
 │       │   ├── SapB1PurchaseOrdersConstants.cs  ← recurso PurchaseOrders (DocEntry, DocNum, DocumentLines)
+│       │   ├── SapB1InventoryTransferRequestsConstants.cs ← recurso InventoryTransferRequests (⚠️ nombre/campos no verificados contra $metadata)
 │       │   └── SapB1ReplicationConstants.cs     ← endpoints U_*, campos U_*, estados PENDING/REPLICATED/FAILED
 │       ├── Mapping/
 │       │   ├── SapYesNoMapper.cs
@@ -176,7 +209,8 @@ src/
 │       │   └── UserTableTypeMapper.cs
 │       ├── Repositories/
 │       │   ├── ArticleServiceLayerLookupRepository.cs  ← lee Items de SAP B1, mapea a Article
-│       │   └── PurchaseOrderServiceLayerLookupRepository.cs ← lee PurchaseOrders (+DocumentLines) de SAP B1
+│       │   ├── PurchaseOrderServiceLayerLookupRepository.cs ← lee PurchaseOrders (+DocumentLines) de SAP B1
+│       │   └── InventoryTransferRequestServiceLayerLookupRepository.cs ← lee InventoryTransferRequests (+DocumentLines) de SAP B1
 │       └── Services/
 │           └── ServiceLayerSchemaProvisioningService.cs ← ISchemaProvisioningService sobre Service Layer
 
@@ -185,7 +219,8 @@ src/
     │   └── ServiceLayerHealthCheck.cs           ← IHealthCheck para /health
     ├── Jobs/
     │   ├── ArticlesSyncJob.cs                   ← [DisallowConcurrentExecution] Quartz job
-    │   └── PurchaseOrdersSyncJob.cs             ← [DisallowConcurrentExecution] Quartz job
+    │   ├── PurchaseOrdersSyncJob.cs             ← [DisallowConcurrentExecution] Quartz job
+    │   └── TransferOutOrdersSyncJob.cs          ← [DisallowConcurrentExecution] Quartz job
     ├── Startup/
     │   └── SchemaBootstrapperHostedService.cs   ← corre EnsureReplicationSchemaUseCase al arrancar
     ├── Program.cs                               ← DI, Quartz, Serilog, Windows Service
@@ -196,6 +231,7 @@ tests/
 └── GNA.AuroraIntegration.Tests/
     ├── ArticleSyncUseCaseTests.cs               ← 7 tests (todos implementados)
     ├── PurchaseOrderSyncUseCaseTests.cs         ← 9 tests (todos implementados)
+    ├── TransferOutOrderSyncUseCaseTests.cs      ← 9 tests (todos implementados)
     └── EnsureReplicationSchemaUseCaseTests.cs   ← tests del schema bootstrapper
 ```
 
@@ -254,11 +290,11 @@ Provisionado automáticamente al arrancar por `EnsureReplicationSchemaUseCase` �
 
 | Campo SAP | Valores posibles |
 |---|---|
-| `U_GNA_AUR_EntityType` | `Article` / `PurchaseOrder` (más en el futuro — ver `ReplicableEntityType`) |
-| `U_GNA_AUR_EntityKey` | SKU del artículo, o DocEntry (como string) para OC |
-| `U_GNA_AUR_Operation` | `I` (Insert) / `U` (Update) — PurchaseOrder solo usa `I` por ahora |
+| `U_GNA_AUR_EntityType` | `Article` / `PurchaseOrder` / `TransferOutOrder` (más en el futuro — ver `ReplicableEntityType`) |
+| `U_GNA_AUR_EntityKey` | SKU del artículo, o DocEntry (como string) para OC / Solicitud de Traslado |
+| `U_GNA_AUR_Operation` | `I` (Insert) / `U` (Update) / `C` (Cancel) — según entidad y flujo |
 | `U_GNA_AUR_Status` | `PENDING` / `REPLICATED` / `FAILED` |
-| `U_GNA_AUR_RetryCount` | Número de reintentos (máx. 4 para Article y para PurchaseOrder) |
+| `U_GNA_AUR_RetryCount` | Número de reintentos (máx. 4 para Article, PurchaseOrder y TransferOutOrder) |
 
 ---
 
@@ -269,6 +305,7 @@ Provisionado automáticamente al arrancar por `EnsureReplicationSchemaUseCase` �
 | `EnsureReplicationSchemaUseCase` | `IEnsureReplicationSchemaUseCase` | ✅ Implementado | Provisiona toda la UDT/UDF/UDO al arrancar |
 | `ArticleSyncUseCase` | `IArticleSyncUseCase` | ✅ Implementado | Flujo completo create/update con validación |
 | `PurchaseOrderSyncUseCase` | `IPurchaseOrderSyncUseCase` | ✅ Implementado | Alta (idempotente vía GET previo) + Modificación por reconciliación de líneas (add/edit/remove, respeta `fulfilledQuantity`) + Cancelación (por flag `Cancelled`, con prioridad sobre Alta/Modificación) |
+| `TransferOutOrderSyncUseCase` | `ITransferOutOrderSyncUseCase` | ✅ Implementado | Alta (idempotente vía GET previo) + Modificación por reconciliación de líneas (SOLO edit/remove, respeta `fulfilledQuantity` — sin add, la API de Aurora no lo expone para este recurso) + Cancelación (por flag `Cancelled`, con prioridad sobre Alta/Modificación). Ver limitaciones en "Entidad `TransferOutOrder`" |
 | `LogisticsCategorySyncUseCase` | `ILogisticsCategorySyncUseCase` | ⚠️ STUB | Solo devuelve valores dummy. Falta implementación real |
 | `ProductBrandsSyncUseCase` | `IProductBrandsSyncUseCase` | ⚠️ STUB | Solo devuelve valores dummy. Falta implementación real |
 
@@ -362,6 +399,85 @@ encolada la entrada (tiene prioridad sobre Alta/Modificación):
 
 ---
 
+## Entidad `TransferOutOrder`
+
+`TransferOutOrder` (header) + `TransferOutOrderLine[]` (líneas), leídas desde el recurso
+`InventoryTransferRequests` de Service Layer (incluye `DocumentLines` sin necesidad de
+`$expand`, mismo patrón que `PurchaseOrders`). Replica hacia Aurora WMS como "transfer out
+order" (`/aurora-erp/transfer-out-orders` — sección "Órdenes de transferencia de salida" en
+la documentación de Aurora, mapeado de negocio a "Solicitud de Traslado" de SAP B1 según el
+doc del proyecto "Integración SAP B1 - Aurora Etapa1 CIRCUITOS").
+
+- `DocEntry` (clave natural — inmutable, se usa como `EntityKey` en la cola y como `externalId` en Aurora)
+- `DocNum` (informativo, no se usa como clave)
+- `Cancelled` (mapeado desde el campo estándar `OWTQ.Cancelled` de Service Layer, "tYES"/"tNO" — ⚠️ verificar en `$metadata` que el nombre/tipo coincide con la versión de B1 en uso). Es la fuente de verdad que usa `TransferOutOrderSyncUseCase` para decidir la rama de Cancelación, con prioridad sobre Alta/Modificación
+- `BannerName` / `BannerExternalId` — sin campo SAP mapeado (mismo criterio que `PurchaseOrder`)
+- `Notes` — sin campo SAP mapeado
+- `Lines[]`: `LineOrder` (WTQ1.LineNum), `ArticleSku` (WTQ1.ItemCode), `Quantity` (WTQ1.Quantity, decimal en SAP → se redondea a `int` al armar el payload de Aurora)
+
+**⚠️ Advertencias no resueltas, a diferencia de `PurchaseOrder` (documentar/validar antes de producción):**
+
+1. **`object_type` del SP de encolado NO VERIFICADO.** `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION`
+   usa el placeholder `'67'` para identificar Solicitud de Traslado (Inventory Transfer Request)
+   en `SBO_SP_TransactionNotification`. A diferencia de `'22'` (Purchase Order, confirmado), este
+   valor **no fue verificado** contra el ambiente SAP B1 real. El usuario indicó explícitamente
+   que lo ajustará él mismo ("Después yo lo ajusto") — **no tratar este valor como confirmado**.
+2. **Recurso Service Layer y nombres de campo de línea no verificados.** `InventoryTransferRequests`
+   (endpoint) y `LineNum`/`ItemCode`/`Quantity` (campos de `DocumentLines`) se asumen análogos a
+   `PurchaseOrders`/POR1 por ser el patrón estándar de todo documento de marketing SAP B1, pero no
+   se confirmaron contra `$metadata` de Service Layer en este ambiente.
+3. **Campos de creación potencialmente requeridos sin mapeo SAP.** El body de
+   `POST /aurora-erp/transfer-out-orders` documentado por Aurora **no marca** `bannerExternalId`,
+   `logisticOperatorExternalId`, `postalCode` ni `shippingPriorityExternalId` como `// optional`
+   (a diferencia de sus contrapartes `*Name`, que sí lo están, y a diferencia de `purchase-orders`,
+   donde `bannerExternalId`/`bannerName` son ambos opcionales). Esta implementación no tiene hoy
+   ningún campo SAP (OWTQ) mapeado a estos cuatro y los omite en el payload (quedan `null`, no se
+   serializan) — **riesgo real de que Aurora rechace el alta con 400** si efectivamente los exige
+   para este recurso. Pendiente de definición de negocio.
+4. **Sin sincronización de header vía PATCH, aunque el endpoint SÍ existe (a diferencia de OC).**
+   Aurora expone `PATCH /aurora-erp/transfer-out-orders/{externalId}` (Órdenes de Compra no lo
+   tiene), pero documenta una precondición: *"Estado de la orden -> PENDIENTE, CONGELADA. Utilizar
+   estado TO_EDIT para modificar el pedido."* No existe hoy una definición de negocio sobre cuándo
+   disparar la transición `TO_EDIT` (`POST .../transitions`), así que `TransferOutOrderSyncUseCase`
+   **no invoca automáticamente** `IAuroraTransferOutOrderApiClient.UpdateTransferOutOrderHeaderAsync`
+   — la capacidad está implementada en el cliente por completitud del contrato, pero queda como
+   backlog inventar el "cuándo" dispararla violaría el principio de "no inventar" del proyecto.
+
+**Modificación de orden — reconciliación de líneas:** cuando la orden ya existe en Aurora,
+`TransferOutOrderSyncUseCase.ReconcileLinesAsync` compara `TransferOutOrder.Lines` (SAP, estado
+completo actual) contra `GET .../articles` (Aurora) por `ArticleSku`:
+
+| Situación | Acción en Aurora |
+|---|---|
+| SKU en SAP, no en Aurora | **⚠️ NO se puede agregar** — la API no expone `POST .../articles` para este recurso. Solo `LogWarning` |
+| SKU en ambos, cantidad distinta, `fulfilledQuantity = 0` | `PATCH .../articles/{sku}` |
+| SKU en ambos, cantidad distinta, `fulfilledQuantity > 0` | **Se omite** — solo `LogWarning` |
+| SKU en Aurora, ya no está en SAP, `fulfilledQuantity = 0` | `DELETE .../articles/{sku}` |
+| SKU en Aurora, ya no está en SAP, `fulfilledQuantity > 0` | **Se omite** — solo `LogWarning` |
+
+Esta es la diferencia estructural más importante respecto a `PurchaseOrder`: `IAuroraPurchaseOrderApiClient`
+tiene `AddPurchaseOrderArticlesAsync` (`POST .../articles`); `IAuroraTransferOutOrderApiClient`
+**no tiene un método equivalente** porque el endpoint no existe en la API de Aurora para
+`transfer-out-orders` — confirmado contra la documentación completa (`Documentacion_API_Aurora__ERP_v.2.pdf`),
+no es una omisión de esta implementación.
+
+La cola no aplica deltas: cada corrida relee el estado completo de la orden en SAP, así que
+es indistinto si la entrada quedó encolada con `U_GNA_AUR_Operation = 'I'`, `'U'` o `'C'`.
+
+**Cancelación de orden:** `TransferOutOrderSyncUseCase.CancelInAuroraAsync` se ejecuta cuando
+`TransferOutOrder.Cancelled == true`, sin importar el `Operation` con el que haya quedado
+encolada la entrada (tiene prioridad sobre Alta/Modificación):
+
+| Situación | Acción en Aurora |
+|---|---|
+| Orden cancelada en SAP y existe en Aurora | `DELETE /aurora-erp/transfer-out-orders/{externalId}` |
+| Orden cancelada en SAP pero nunca existió en Aurora | **No-op** — se marca `REPLICATED` igual, solo se loguea información |
+
+`AuroraTransferOutOrderApiClient.CancelTransferOutOrderAsync` es idempotente: un 404 de Aurora
+(ya cancelada/eliminada en una corrida anterior) no se trata como error.
+
+---
+
 ## Resiliencia HTTP
 
 Ambos clientes (`ServiceLayerClient` y `AuroraArticleApiClient`) tienen:
@@ -394,7 +510,8 @@ Ambos clientes (`ServiceLayerClient` y `AuroraArticleApiClient`) tienen:
   },
   "Jobs": {
     "ArticlesSyncJob": { "Cron": "0 * * * * ?" },
-    "PurchaseOrdersSyncJob": { "Cron": "0 * * * * ?" }
+    "PurchaseOrdersSyncJob": { "Cron": "0 * * * * ?" },
+    "TransferOutOrdersSyncJob": { "Cron": "0 * * * * ?" }
   },
   "Serilog": { ... }
 }
@@ -437,9 +554,23 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
   (sección 8). Verificar el ancho real provisionado para `Code` en `@GNA_AUR_REP_QUEUE`
   antes de ir a producción con volumen — afecta a ambos SP por igual.
 
+### `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION`
+- Se llama desde `SBO_SP_TransactionNotification`
+- Detecta Add (`A`), Update (`U`) **y** Cancel (`C`) en `object_type = '67'` (Solicitud de Traslado / Inventory Transfer Request)
+- **⚠️⚠️⚠️ `object_type = '67'` es un placeholder NO VERIFICADO.** El usuario indicó explícitamente
+  que lo ajustará él mismo antes de producción ("Después yo lo ajusto") — no tratar como confirmado.
+- Key de Transaction Notification = `DocEntry` (columna única, igual patrón que Items/OC)
+- Evita duplicados: solo encola si no hay un `PENDING` para el mismo DocEntry (mismo criterio que
+  `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION`: `TransferOutOrderSyncUseCase` siempre relee el
+  estado completo de la orden en SAP, nunca aplica un delta)
+- Inserta directamente en `@GNA_AUR_REP_QUEUE` con `EntityType = 'TransferOutOrder'` y
+  `U_GNA_AUR_Operation = 'I'/'U'/'C'` según corresponda
+- Mismo riesgo conocido de longitud de `Code` que los otros dos SP de encolado (`'TO-' || DocEntry || timestamp`)
+
 ### `SBO_SP_TransactionNotification`
 - Hook estándar de SAP B1
-- Llama a ambos SP (`SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION` y `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION`) y propaga error/mensaje
+- Llama a los 3 SP (`SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION`, `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION`
+  y `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION`) y propaga error/mensaje
 
 ---
 
@@ -459,6 +590,7 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 |---|---|---|
 | `ArticleSyncUseCaseTests.cs` | 7 tests | ✅ Completos (happy path, create/update, error handling, CT propagation, propagación de excepción + mapping de bannerName/brandExternalId/brandName en create y update) |
 | `PurchaseOrderSyncUseCaseTests.cs` | 9 tests | ✅ Completos (5 mínimos + reconciliación add/edit/remove + omisión de líneas con `fulfilledQuantity > 0` + cancelación existente/no-existente en Aurora) |
+| `TransferOutOrderSyncUseCaseTests.cs` | 9 tests | ✅ Completos (mismo set que `PurchaseOrderSyncUseCaseTests`, adaptado: reconciliación verifica edit/remove pero NUNCA una llamada de alta de línea, ya que ese método no existe en `IAuroraTransferOutOrderApiClient`) |
 | `EnsureReplicationSchemaUseCaseTests.cs` | 13 tests | ✅ Completos (incluye tabla/UDO de Banners y verificación de que no se le agregan UDFs) |
 
 ---
@@ -469,7 +601,9 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 - [ ] Implementar `LogisticsCategorySyncUseCase` real (lee de SAP B1 y sincroniza con Aurora)
 - [ ] Implementar `ProductBrandsSyncUseCase` real
 - [ ] Implementar endpoint `POST /events/status` con use case real (inbound desde Aurora)
-- [ ] Definir origen de `AuroraApi:Warehouse` (fijo por configuración vs. mapeado desde `WhsCode` de SAP) — bloquea que `PurchaseOrderSyncUseCase` funcione contra Aurora real si el endpoint efectivamente exige el param
+- [ ] Definir origen de `AuroraApi:Warehouse` (fijo por configuración vs. mapeado desde `WhsCode` de SAP) — bloquea que `PurchaseOrderSyncUseCase`/`TransferOutOrderSyncUseCase` funcionen contra Aurora real si el endpoint efectivamente exige el param
+- [ ] **Verificar `object_type` real de Solicitud de Traslado en `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION`** — hoy usa el placeholder NO VERIFICADO `'67'`, el usuario dijo que lo ajusta él mismo ("Después yo lo ajusto"). Bloquea que el circuito de Transferencias de Salida encole nada en un ambiente real hasta confirmarlo
+- [ ] Verificar contra `$metadata` de Service Layer que el recurso `InventoryTransferRequests` y los campos `LineNum`/`ItemCode`/`Quantity` de `DocumentLines` existen tal como se asumieron (análogos a `PurchaseOrders`/POR1, sin confirmar)
 
 ### Circuito de Órdenes de Compra — pendiente
 - [x] ~~Modificación de OC / líneas de OC en SAP → Aurora~~ — implementado como reconciliación de líneas (`add`/`edit`/`remove`), ver sección "Entidad `PurchaseOrder`"
@@ -479,6 +613,17 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 - [ ] Definir si `bannerName`/`bannerExternalId`/`notes` de la OC deben mapearse desde algún campo/UDF de SAP (hoy se omiten; Aurora tampoco expone forma de actualizarlos post-creación en `purchase-orders`)
 - [ ] Revisar redondeo de `Quantity` (decimal SAP → int Aurora) en `PurchaseOrderSyncUseCase.ToAuroraQuantity` si el cliente usa UoM con cantidades fraccionarias
 - [ ] Validar con el cliente/Aurora el criterio de "línea ya cumplida" (`fulfilledQuantity > 0` bloquea edit/remove): confirmar que ese es el comportamiento deseado ante una modificación en SAP sobre una línea parcialmente recibida
+
+### Circuito de Transferencias de Salida (Solicitud de Traslado) — pendiente
+- [x] ~~Alta de Solicitud de Traslado en SAP → Aurora~~ — implementado (`TransferOutOrderSyncUseCase`, chequeo de idempotencia vía GET)
+- [x] ~~Modificación de líneas en SAP → Aurora~~ — implementado como reconciliación **edit/remove únicamente** (sin add — la API de Aurora no lo expone para este recurso), ver sección "Entidad `TransferOutOrder`"
+- [x] ~~Cancelación en SAP → Aurora~~ — implementado vía flag `TransferOutOrder.Cancelled` + `CancelTransferOutOrderAsync`, mismo patrón que `PurchaseOrder`
+- [ ] **Verificar `object_type = '67'` (NO VERIFICADO, placeholder) en `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION`** antes de habilitar en producción — el usuario confirmó que lo ajusta él mismo
+- [ ] Verificar recurso `InventoryTransferRequests` y campos de `DocumentLines` contra `$metadata` real de Service Layer (no confirmado, asumido análogo a `PurchaseOrders`/POR1)
+- [ ] Definir si `bannerExternalId`/`logisticOperatorExternalId`/`postalCode`/`shippingPriorityExternalId` deben mapearse desde algún campo/UDF de SAP — Aurora no los marca como opcionales en la documentación de creación, a diferencia de sus contrapartes `*Name`; hoy se omiten y podrían causar un 400 real
+- [ ] Definir cuándo (si alguna vez) disparar la transición de estado `TO_EDIT` para poder usar `PATCH /aurora-erp/transfer-out-orders/{externalId}` (sincronización de header) — no implementado, la precondición de estado documentada por Aurora no tiene definición de negocio hoy
+- [ ] Aviso de cambio de estado (Aurora → SAP) y Reporte de ingreso (Aurora → SAP): mismo alcance pendiente que en `PurchaseOrder`
+- [ ] Revisar redondeo de `Quantity` (decimal SAP → int Aurora) en `TransferOutOrderSyncUseCase.ToAuroraQuantity`, mismo criterio que `PurchaseOrderSyncUseCase`
 
 ### Menores / mejoras técnicas (de `copilot-instructions.md` sección 9)
 - [x] ~~`BrandExternalId` está comentado en `ArticleSyncUseCase` mapping~~ — descomentado y con `BrandName`/`BannerName` agregados (2026-08-11), ver sección "Entidad `Article`"
@@ -542,3 +687,4 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 | 2026-08-11 | `U_GNA_AUR_Banner` pasó de texto libre (Alpha 150) a LinkedTable contra `GNA_AUR_BANNERS` (Alpha 30, igual patrón que CatLog/Marca) en `EnsureReplicationSchemaUseCase` — cambio hecho localmente por el usuario, confirmado como intencional y commiteado en este mismo cambio |
 | 2026-08-11 | `ArticleServiceLayerLookupRepository.GetNamesByCodeAsync` agregado (método genérico, reemplaza el antes específico `GetBrandNamesByCodeAsync`): resuelve Code → Name contra `U_GNA_AUR_MARCAS` y `U_GNA_AUR_BANNERS` en una consulta batcheada por tabla por corrida (no N+1), reutilizando el patrón `$filter "or"` en lotes de 20 ya usado para Items. Nuevas constantes `SapB1ProductBrandsConstants` y `SapB1BannersConstants` |
 | 2026-08-11 | 2 tests nuevos agregados a `ArticleSyncUseCaseTests` verificando el mapeo de `bannerExternalId`/`bannerName`/`brandExternalId`/`brandName` hacia Aurora en create y update |
+| 2026-08-11 | **Circuito de Solicitud de Traslado / Transferencia de Salida implementado completo** (Alta + Modificación de líneas + Cancelación), a pedido explícito del usuario, mismo patrón que Órdenes de Compra: `TransferOutOrder`/`TransferOutOrderLine` (Domain) + excepciones, `IInventoryTransferRequestLookupRepository`/`ITransferOutOrderReplicationRepository`, DTOs de Aurora (`CreateAuroraTransferOutOrderDto`/`UpdateAuroraTransferOutOrderDto`/`TransferOutOrderArticleDto`/`TransferOutOrderArticleStateDto`/`AuroraTransferOutOrderDto`), `IAuroraTransferOutOrderApiClient`/`AuroraTransferOutOrderApiClient`, `ITransferOutOrderPayloadValidator`/`TransferOutOrderPayloadValidator`, `TransferOutOrderSyncUseCase`/`TransferOutOrderSyncUseCaseLoggingDecorator`, `InventoryTransferRequestServiceLayerLookupRepository`, `TransferOutOrderReplicationRepository`, `SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION` + `SBO_SP_TransactionNotification` actualizado, `TransferOutOrdersSyncJob` + DI/Quartz en `Program.cs`, 9 tests en `TransferOutOrderSyncUseCaseTests`. `ReplicableEntityType.TransferOutOrder = 5` ya existía en el enum (pre-anticipado). Diferencias clave respecto a Órdenes de Compra documentadas en la sección "Entidad `TransferOutOrder`": (1) la API de Aurora no expone alta de artículos sobre una orden existente (`POST .../articles` no existe para este recurso) — líneas nuevas en SAP se loguean y se omiten, no es una decisión de negocio sino una limitación real de la API; (2) `object_type = '67'` en el SP de encolado es un placeholder **NO VERIFICADO** — el usuario confirmó que lo ajustará él mismo; (3) `bannerExternalId`/`logisticOperatorExternalId`/`postalCode`/`shippingPriorityExternalId` no están marcados como opcionales en la documentación de creación de Aurora pero no tienen campo SAP mapeado — riesgo de 400 sin confirmar; (4) el PATCH de cabecera sí existe (a diferencia de OC) pero no se invoca automáticamente por la precondición de estado `TO_EDIT` sin definición de negocio. |
