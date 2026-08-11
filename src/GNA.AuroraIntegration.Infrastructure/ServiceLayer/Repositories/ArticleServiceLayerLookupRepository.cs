@@ -2,6 +2,7 @@ using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Entities;
 using GNA.AuroraIntegration.Domain.Interfaces;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Constants;
+using GNA.AuroraIntegration.Infrastructure.ServiceLayer.DTOs;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Mapping;
 using Microsoft.Extensions.Logging;
 using System.Text.Json.Serialization;
@@ -114,11 +115,4 @@ internal sealed class ServiceLayerItemDto
     public string? IsBulky { get; set; }
     public string? IsCaged { get; set; }
 
-}
-
-/// <summary>Envoltorio genérico de colección OData de Service Layer.</summary>
-internal sealed class ServiceLayerCollectionDto<T>
-{
-    [JsonPropertyName("value")]
-    public List<T> Value { get; set; } = new();
 }

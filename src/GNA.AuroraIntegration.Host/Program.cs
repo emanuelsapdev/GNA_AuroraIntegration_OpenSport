@@ -45,6 +45,11 @@ builder.Services.AddScoped<IReplicationControlStore, ReplicationControlStore>();
 builder.Services.AddScoped<ISchemaProvisioningService, ServiceLayerSchemaProvisioningService>();
 builder.Services.AddScoped<IArticleLookupRepository, ArticleServiceLayerLookupRepository>();
 builder.Services.AddScoped<IArticleReplicationRepository, ArticleReplicationRepository>();
+builder.Services.AddScoped<IPurchaseOrderLookupRepository, PurchaseOrderServiceLayerLookupRepository>();
+builder.Services.AddScoped<IPurchaseOrderReplicationRepository, PurchaseOrderReplicationRepository>();
+
+// Singleton: AuroraPurchaseOrderApiClient gestiona internamente su RestClient (misma convención que AuroraArticleApiClient)
+builder.Services.AddSingleton<IAuroraPurchaseOrderApiClient, AuroraPurchaseOrderApiClient>();
 
 // Agregar repositorios y casos de uso
 builder.Services.AddScoped<IEnsureReplicationSchemaUseCase, EnsureReplicationSchemaUseCase>();
@@ -52,17 +57,27 @@ builder.Services.AddScoped<IArticlePayloadValidator, ArticlePayloadValidator>();
 builder.Services.AddScoped<IArticleSyncUseCase, ArticleSyncUseCase>();
 builder.Services.Decorate<IArticleSyncUseCase, ArticleSyncUseCaseLoggingDecorator>();
 
+builder.Services.AddScoped<IPurchaseOrderPayloadValidator, PurchaseOrderPayloadValidator>();
+builder.Services.AddScoped<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCase>();
+builder.Services.Decorate<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCaseLoggingDecorator>();
+
 // ---- Bootstrap de esquema: SIEMPRE antes de Quartz ----
 builder.Services.AddHostedService<SchemaBootstrapperHostedService>(); // DESCOMENTAR 
 
-// Configurar Quartz para ejecutar el job de sincronización de artículos
+// Configurar Quartz para ejecutar los jobs de sincronización
 builder.Services.AddQuartz(q =>
 {
-    var jobKey = new JobKey("ArticlesSyncJob");
-    q.AddJob<ArticlesSyncJob>(opts => opts.WithIdentity(jobKey));
-    q.AddTrigger(t => t.ForJob(jobKey)
+    var articlesJobKey = new JobKey("ArticlesSyncJob");
+    q.AddJob<ArticlesSyncJob>(opts => opts.WithIdentity(articlesJobKey));
+    q.AddTrigger(t => t.ForJob(articlesJobKey)
         .WithIdentity("ArticlesSyncJob-trigger")
         .WithCronSchedule(builder.Configuration["Jobs:ArticlesSyncJob:Cron"]!));
+
+    var purchaseOrdersJobKey = new JobKey("PurchaseOrdersSyncJob");
+    q.AddJob<PurchaseOrdersSyncJob>(opts => opts.WithIdentity(purchaseOrdersJobKey));
+    q.AddTrigger(t => t.ForJob(purchaseOrdersJobKey)
+        .WithIdentity("PurchaseOrdersSyncJob-trigger")
+        .WithCronSchedule(builder.Configuration["Jobs:PurchaseOrdersSyncJob:Cron"]!));
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

@@ -1,0 +1,54 @@
+ALTER PROCEDURE SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+    OUT error_code    INT,
+    OUT error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+    -- object_type '22' = Purchase Order. Cubre Alta y Modificación (transaction_type 'A'/'U').
+    -- Cancelación de OC todavía no está implementada (ver PROJECT_PROGRESS.md, backlog).
+	IF (:object_type = '22' AND :transaction_type IN ('A', 'U')) THEN
+
+		DECLARE v_exists  INT := 0;
+	    DECLARE v_code    NVARCHAR(50);
+		DECLARE v_doc_entry    NVARCHAR(255);
+		DECLARE v_operation    NVARCHAR(1);
+
+		-- El key de Purchase Order en Transaction Notification es DocEntry (columna única).
+		v_doc_entry := :list_of_cols_val_tab_del;
+
+		IF (:transaction_type = 'A') THEN
+			v_operation := 'I';
+		ELSE
+			v_operation := 'U';
+		END IF;
+
+	    -- Evitar encolar duplicados si ya hay un pendiente para esta OC. No importa si el
+	    -- pendiente existente quedó como 'I' y ahora llega una 'U' (o viceversa): el use case
+	    -- de C# (PurchaseOrderSyncUseCase) siempre relee el estado completo de la OC en SAP
+	    -- al procesar la cola, nunca aplica un delta — así que un solo registro PENDING alcanza.
+	    SELECT COUNT(*) INTO v_exists
+	    FROM "@GNA_AUR_REP_QUEUE"
+	    WHERE "U_GNA_AUR_EntityType" = 'PurchaseOrder'
+	      AND "U_GNA_AUR_EntityKey"  = :v_doc_entry
+	      AND "U_GNA_AUR_Status"     = 'PENDING';
+
+	    IF :v_exists = 0 THEN
+	        v_code := 'PO-' || :v_doc_entry || '-' || TO_VARCHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS');
+
+	        INSERT INTO "@GNA_AUR_REP_QUEUE"
+	            ("Code", "Name", "U_GNA_AUR_EntityType", "U_GNA_AUR_EntityKey", "U_GNA_AUR_Operation", "U_GNA_AUR_Status", "U_GNA_AUR_RetryCount")
+	        VALUES
+	            (:v_code, :v_code, 'PurchaseOrder', :v_doc_entry, :v_operation, 'PENDING', 0);
+	    END IF;
+
+	    SELECT :error_code, :error_message FROM DUMMY;
+	    RETURN;
+    END IF;
+
+END;

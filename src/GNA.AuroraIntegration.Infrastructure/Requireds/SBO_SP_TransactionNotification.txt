@@ -1,4 +1,4 @@
-﻿-- B1 DEPENDS: BEFORE:PT:PROCESS_START
+-- B1 DEPENDS: BEFORE:PT:PROCESS_START
 
 ALTER PROCEDURE SBO_SP_TransactionNotification
 (
@@ -22,6 +22,16 @@ error_message := N'Ok';
 
 
 CALL SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION(
+	:object_type,
+	:transaction_type,
+	:num_of_cols_in_key,
+	:list_of_key_cols_tab_del,
+	:list_of_cols_val_tab_del,
+	:error,
+	:error_message
+);
+
+CALL SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION(
 	:object_type,
 	:transaction_type,
 	:num_of_cols_in_key,

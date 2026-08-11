@@ -31,17 +31,17 @@ public sealed class ArticleSyncUseCaseTests
             .ReturnsAsync([article]);
 
         _auroraApiMock
-            .Setup(c => c.GetArticleBySkuAsync(It.Is<string>(sku => sku == article.Sku), warehouse: null, cancellationToken))
+            .Setup(c => c.GetArticleBySkuAsync(It.Is<string>(sku => sku == article.Sku), null, cancellationToken))
             .ReturnsAsync((AuroraArticleDto?)null);
 
         ArticleSyncUseCase useCase = CreateSut();
 
         await useCase.ExecuteAsync(cancellationToken);
 
-        _auroraApiMock.Verify(c => c.GetArticleBySkuAsync(It.Is<string>(sku => sku == article.Sku), warehouse: null, cancellationToken), Times.Once);
+        _auroraApiMock.Verify(c => c.GetArticleBySkuAsync(It.Is<string>(sku => sku == article.Sku), null, cancellationToken), Times.Once);
         _auroraApiMock.Verify(c => c.CreateArticleAsync(
             It.Is<CreateAuroraArticleDto>(dto => dto.Sku == article.Sku && dto.Ean == article.PrimaryEan),
-            warehouse: null,
+            null,
             cancellationToken), Times.Once);
         _repositoryMock.Verify(r => r.MarkArticleAsReplicatedAsync(article.Sku, cancellationToken), Times.Once);
     }
@@ -57,11 +57,11 @@ public sealed class ArticleSyncUseCaseTests
             .ReturnsAsync([createArticle, updateArticle]);
 
         _auroraApiMock
-            .Setup(c => c.GetArticleBySkuAsync("A001", warehouse: null, It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetArticleBySkuAsync("A001", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AuroraArticleDto?)null);
 
         _auroraApiMock
-            .Setup(c => c.GetArticleBySkuAsync("A002", warehouse: null, It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetArticleBySkuAsync("A002", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new AuroraArticleDto { Sku = "A002", Name = "Artículo 2" });
 
         ArticleSyncUseCase useCase = CreateSut();
@@ -71,8 +71,8 @@ public sealed class ArticleSyncUseCaseTests
         Assert.Equal(2, result.processed);
         Assert.Equal(2, result.successful);
         Assert.Equal(0, result.failed);
-        _auroraApiMock.Verify(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), warehouse: null, It.IsAny<CancellationToken>()), Times.Once);
-        _auroraApiMock.Verify(c => c.UpdateArticleAsync("A002", It.IsAny<UpdateAuroraArticleDto>(), warehouse: null, It.IsAny<CancellationToken>()), Times.Once);
+        _auroraApiMock.Verify(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), null, It.IsAny<CancellationToken>()), Times.Once);
+        _auroraApiMock.Verify(c => c.UpdateArticleAsync("A002", It.IsAny<UpdateAuroraArticleDto>(), null, It.IsAny<CancellationToken>()), Times.Once);
         _repositoryMock.Verify(r => r.MarkArticleAsReplicatedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
@@ -86,11 +86,11 @@ public sealed class ArticleSyncUseCaseTests
             .ReturnsAsync([article]);
 
         _auroraApiMock
-            .Setup(c => c.GetArticleBySkuAsync("A001", warehouse: null, It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetArticleBySkuAsync("A001", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync((AuroraArticleDto?)null);
 
         _auroraApiMock
-            .Setup(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), warehouse: null, It.IsAny<CancellationToken>()))
+            .Setup(c => c.CreateArticleAsync(It.IsAny<CreateAuroraArticleDto>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ArticleAuroraApiException("A001", "Simulated API failure"));
 
         ArticleSyncUseCase useCase = CreateSut();
@@ -114,11 +114,11 @@ public sealed class ArticleSyncUseCaseTests
             .ReturnsAsync([article]);
 
         _auroraApiMock
-            .Setup(c => c.GetArticleBySkuAsync("A001", warehouse: null, cancellationToken))
+            .Setup(c => c.GetArticleBySkuAsync("A001", null, cancellationToken))
             .ReturnsAsync(new AuroraArticleDto { Sku = "A001" });
 
         _auroraApiMock
-            .Setup(c => c.UpdateArticleAsync("A001", It.IsAny<UpdateAuroraArticleDto>(), warehouse: null, cancellationToken))
+            .Setup(c => c.UpdateArticleAsync("A001", It.IsAny<UpdateAuroraArticleDto>(), null, cancellationToken))
             .Returns(Task.CompletedTask);
 
         _repositoryMock
@@ -130,8 +130,8 @@ public sealed class ArticleSyncUseCaseTests
         await useCase.ExecuteAsync(cancellationToken);
 
         _repositoryMock.Verify(r => r.GetPendingArticlesAsync(100, cancellationToken), Times.Once);
-        _auroraApiMock.Verify(c => c.GetArticleBySkuAsync("A001", warehouse: null, cancellationToken), Times.Once);
-        _auroraApiMock.Verify(c => c.UpdateArticleAsync("A001", It.IsAny<UpdateAuroraArticleDto>(), warehouse: null, cancellationToken), Times.Once);
+        _auroraApiMock.Verify(c => c.GetArticleBySkuAsync("A001", null, cancellationToken), Times.Once);
+        _auroraApiMock.Verify(c => c.UpdateArticleAsync("A001", It.IsAny<UpdateAuroraArticleDto>(), null, cancellationToken), Times.Once);
         _repositoryMock.Verify(r => r.MarkArticleAsReplicatedAsync("A001", cancellationToken), Times.Once);
     }
 
