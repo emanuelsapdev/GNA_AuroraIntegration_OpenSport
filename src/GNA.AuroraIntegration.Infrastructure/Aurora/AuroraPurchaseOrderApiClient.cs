@@ -285,6 +285,45 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
         }
     }
 
+    public async Task CancelPurchaseOrderAsync(string externalId, string? warehouse, CancellationToken ct = default)
+    {
+        RestRequest request = new($"{Endpoint}/{externalId}", Method.Delete);
+        AddWarehouseParameter(request, warehouse);
+
+        RestResponse response;
+        try
+        {
+            response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
+            {
+                RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
+                ThrowIfTransientFailure(transientResponse, Method.Delete, $"{Endpoint}/{externalId}");
+                return transientResponse;
+            }, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex,
+                "Error de transporte cancelando Orden de Compra '{ExternalId}' en Aurora.", externalId);
+            throw new PurchaseOrderAuroraApiException(
+                externalId, $"Error de conexión al cancelar la Orden de Compra '{externalId}' en Aurora.", ex);
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            // Idempotente: si ya no está en Aurora (nunca se creó o ya fue cancelada/eliminada
+            // en una corrida anterior), no hay nada que cancelar.
+            return;
+        }
+
+        if (!response.IsSuccessful)
+        {
+            _logger.LogError(
+                "Aurora API error {StatusCode} cancelando Orden de Compra '{ExternalId}': {Body}",
+                response.StatusCode, externalId, response.Content);
+            throw new PurchaseOrderAuroraApiException(externalId, $"Error cancelando Orden de Compra {externalId}: {response.StatusCode}");
+        }
+    }
+
     private void AddWarehouseParameter(RestRequest request, string? warehouse)
     {
         var resolved = warehouse ?? _defaultWarehouse;

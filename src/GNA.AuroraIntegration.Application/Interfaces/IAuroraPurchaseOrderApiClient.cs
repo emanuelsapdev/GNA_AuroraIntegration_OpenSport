@@ -7,6 +7,9 @@ public interface IAuroraPurchaseOrderApiClient
     Task CreatePurchaseOrderAsync(CreateAuroraPurchaseOrderDto purchaseOrder, string? warehouse, CancellationToken ct = default);
     Task<AuroraPurchaseOrderDto?> GetPurchaseOrderByExternalIdAsync(string externalId, string? warehouse, CancellationToken ct = default);
 
+    /// <summary>Cancela (DELETE) una OC existente en Aurora. Idempotente: no falla si ya no existe.</summary>
+    Task CancelPurchaseOrderAsync(string externalId, string? warehouse, CancellationToken ct = default);
+
     /// <summary>Estado actual de las líneas de una OC en Aurora (cantidad solicitada vs. cumplida).</summary>
     Task<IReadOnlyList<PurchaseOrderArticleStateDto>> GetPurchaseOrderArticlesAsync(string externalId, string? warehouse, CancellationToken ct = default);
 

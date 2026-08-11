@@ -61,6 +61,7 @@ internal static class SapB1ReplicationConstants
         {
             public const string Insert = "I";
             public const string Update = "U";
+            public const string Cancel = "C";
         }
     }
 

@@ -18,15 +18,16 @@ de forma programada (Quartz.NET) y expone endpoints mínimos de salud e ingesta 
 3. El use case lee los SKUs pendientes de la cola, obtiene el `Article` completo desde Service Layer, y lo crea o actualiza en Aurora WMS.
 4. Marca el artículo como `REPLICATED` o `FAILED` en la cola con historial en `@GNA_AUR_REP_ATTEMPT`.
 
-**Flujo central (Outbound) — Órdenes de Compra (Alta + Modificación de líneas):**
-1. SAP B1 enola una Orden de Compra (DocEntry) en `@GNA_AUR_REP_QUEUE` con `EntityType = 'PurchaseOrder'`, disparado por `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION` (llamado desde `SBO_SP_TransactionNotification`, `object_type = '22'`, `transaction_type` `A` o `U`).
+**Flujo central (Outbound) — Órdenes de Compra (Alta + Modificación de líneas + Cancelación):**
+1. SAP B1 enola una Orden de Compra (DocEntry) en `@GNA_AUR_REP_QUEUE` con `EntityType = 'PurchaseOrder'`, disparado por `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION` (llamado desde `SBO_SP_TransactionNotification`, `object_type = '22'`, `transaction_type` `A`, `U` o `C`).
 2. El job de Quartz (`PurchaseOrdersSyncJob`) llama a `PurchaseOrderSyncUseCase`.
-3. El use case lee los DocEntry pendientes y obtiene la OC completa (header + `DocumentLines`) desde Service Layer (`PurchaseOrders`).
-4. Chequea si la OC ya existe en Aurora (`GET /aurora-erp/purchase-orders/{externalId}`):
-   - **No existe** → la crea completa con `POST /aurora-erp/purchase-orders`.
-   - **Ya existe** → como Aurora no expone un PATCH de header para `purchase-orders` (a diferencia de `sale-orders`), se **reconcilian las líneas** contra `GET .../articles`: agrega las nuevas (`POST .../articles`), edita las que cambiaron de cantidad (`PATCH .../articles/{sku}`) y elimina las que ya no están en SAP (`DELETE .../articles/{sku}`). Las líneas con `fulfilledQuantity > 0` en Aurora nunca se editan ni se eliminan (solo se loguea una advertencia).
+3. El use case lee los DocEntry pendientes y obtiene la OC completa (header + `Cancelled` + `DocumentLines`) desde Service Layer (`PurchaseOrders`).
+4. Rama de decisión (por prioridad):
+   - **`PurchaseOrder.Cancelled == true`** → cancela la OC en Aurora (`DELETE /aurora-erp/purchase-orders/{externalId}`), o no hace nada si nunca llegó a existir allí (no-op exitoso). Tiene prioridad sobre Alta/Modificación sin importar con qué `Operation` haya quedado encolada la entrada — el flag `Cancelled` de SAP es la fuente de verdad, no el valor histórico de la cola.
+   - **No cancelada y no existe en Aurora** (`GET /aurora-erp/purchase-orders/{externalId}`) → la crea completa con `POST /aurora-erp/purchase-orders`.
+   - **No cancelada y ya existe** → como Aurora no expone un PATCH de header para `purchase-orders` (a diferencia de `sale-orders`), se **reconcilian las líneas** contra `GET .../articles`: agrega las nuevas (`POST .../articles`), edita las que cambiaron de cantidad (`PATCH .../articles/{sku}`) y elimina las que ya no están en SAP (`DELETE .../articles/{sku}`). Las líneas con `fulfilledQuantity > 0` en Aurora nunca se editan ni se eliminan (solo se loguea una advertencia).
 5. Marca la OC como `REPLICATED` o `FAILED` en la cola con historial en `@GNA_AUR_REP_ATTEMPT`.
-6. **Pendiente (backlog):** Cancelación de OC, sincronización de campos de header (`bannerName`/`bannerExternalId`/`notes` — Aurora no expone endpoint para esto en `purchase-orders`), Reporte de ingreso (Aurora → SAP) y Aviso de cambio de estado (Aurora → SAP) — ver circuito completo en el doc del proyecto "Integración SAP B1 - Aurora Etapa1 CIRCUITOS".
+6. **Pendiente (backlog):** sincronización de campos de header (`bannerName`/`bannerExternalId`/`notes` — Aurora no expone endpoint para esto en `purchase-orders`), Reporte de ingreso (Aurora → SAP) y Aviso de cambio de estado (Aurora → SAP) — ver circuito completo en el doc del proyecto "Integración SAP B1 - Aurora Etapa1 CIRCUITOS".
 
 ---
 
@@ -192,7 +193,7 @@ src/
 tests/
 └── GNA.AuroraIntegration.Tests/
     ├── ArticleSyncUseCaseTests.cs               ← 5 tests (todos implementados)
-    ├── PurchaseOrderSyncUseCaseTests.cs         ← 5 tests (todos implementados)
+    ├── PurchaseOrderSyncUseCaseTests.cs         ← 9 tests (todos implementados)
     └── EnsureReplicationSchemaUseCaseTests.cs   ← tests del schema bootstrapper
 ```
 
@@ -254,7 +255,7 @@ Provisionado automáticamente al arrancar por `EnsureReplicationSchemaUseCase` �
 |---|---|---|---|
 | `EnsureReplicationSchemaUseCase` | `IEnsureReplicationSchemaUseCase` | ✅ Implementado | Provisiona toda la UDT/UDF/UDO al arrancar |
 | `ArticleSyncUseCase` | `IArticleSyncUseCase` | ✅ Implementado | Flujo completo create/update con validación |
-| `PurchaseOrderSyncUseCase` | `IPurchaseOrderSyncUseCase` | ✅ Implementado | Alta (idempotente vía GET previo) + Modificación por reconciliación de líneas (add/edit/remove, respeta `fulfilledQuantity`). Falta Cancelación |
+| `PurchaseOrderSyncUseCase` | `IPurchaseOrderSyncUseCase` | ✅ Implementado | Alta (idempotente vía GET previo) + Modificación por reconciliación de líneas (add/edit/remove, respeta `fulfilledQuantity`) + Cancelación (por flag `Cancelled`, con prioridad sobre Alta/Modificación) |
 | `LogisticsCategorySyncUseCase` | `ILogisticsCategorySyncUseCase` | ⚠️ STUB | Solo devuelve valores dummy. Falta implementación real |
 | `ProductBrandsSyncUseCase` | `IProductBrandsSyncUseCase` | ⚠️ STUB | Solo devuelve valores dummy. Falta implementación real |
 
@@ -281,6 +282,7 @@ de Service Layer (incluye `DocumentLines` sin necesidad de `$expand`, igual que 
 
 - `DocEntry` (clave natural — inmutable, se usa como `EntityKey` en la cola y como `externalId` en Aurora)
 - `DocNum` (informativo, no se usa como clave)
+- `Cancelled` (mapeado desde el campo estándar `OPOR.Cancelled` de Service Layer, "tYES"/"tNO" — ⚠️ verificar en `$metadata` que el nombre/tipo coincide con la versión de B1 en uso). Es la fuente de verdad que usa `PurchaseOrderSyncUseCase` para decidir la rama de Cancelación, con prioridad sobre Alta/Modificación
 - `BannerName` / `BannerExternalId` — **no mapeados aún** (opcionales en Aurora, sin campo SAP definido; y sin endpoint de Aurora para actualizarlos post-creación)
 - `Notes` — no mapeado aún (misma limitación que arriba)
 - `Lines[]`: `LineOrder` (POR1.LineNum), `ArticleSku` (POR1.ItemCode), `Quantity` (POR1.Quantity, decimal en SAP → se redondea a `int` al armar el payload de Aurora)
@@ -305,7 +307,19 @@ completo actual) contra `GET .../articles` (Aurora) por `ArticleSku`:
 | SKU en Aurora, ya no está en SAP, `fulfilledQuantity > 0` | **Se omite** — solo `LogWarning` |
 
 La cola no aplica deltas: cada corrida relee el estado completo de la OC en SAP, así que
-es indistinto si la entrada quedó encolada con `U_GNA_AUR_Operation = 'I'` o `'U'`.
+es indistinto si la entrada quedó encolada con `U_GNA_AUR_Operation = 'I'`, `'U'` o `'C'`.
+
+**Cancelación de OC:** `PurchaseOrderSyncUseCase.CancelInAuroraAsync` se ejecuta cuando
+`PurchaseOrder.Cancelled == true`, sin importar el `Operation` con el que haya quedado
+encolada la entrada (tiene prioridad sobre Alta/Modificación):
+
+| Situación | Acción en Aurora |
+|---|---|
+| OC cancelada en SAP y existe en Aurora | `DELETE /aurora-erp/purchase-orders/{externalId}` |
+| OC cancelada en SAP pero nunca existió en Aurora | **No-op** — se marca `REPLICATED` igual, solo se loguea información |
+
+`AuroraPurchaseOrderApiClient.CancelPurchaseOrderAsync` es idempotente: un 404 de Aurora
+(ya cancelada/eliminada en una corrida anterior) no se trata como error.
 
 ---
 
@@ -370,18 +384,19 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 
 ### `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION`
 - Se llama desde `SBO_SP_TransactionNotification`
-- Detecta Add (`A`) **y** Update (`U`) en `object_type = '22'` (Purchase Order / Orden de Compra)
+- Detecta Add (`A`), Update (`U`) **y** Cancel (`C`) en `object_type = '22'` (Purchase Order / Orden de Compra)
 - Key de Transaction Notification para OC = `DocEntry` (columna única, igual patrón que Items)
 - Evita duplicados: solo encola si no hay un `PENDING` para el mismo DocEntry (no importa si el
-  pendiente existente quedó como `I` y ahora llega una `U`, o viceversa: `PurchaseOrderSyncUseCase`
-  siempre relee el estado completo de la OC en SAP, nunca aplica un delta)
-- Inserta directamente en `@GNA_AUR_REP_QUEUE` con `EntityType = 'PurchaseOrder'`
+  pendiente existente quedó como `I`, `U` o `C`: `PurchaseOrderSyncUseCase` siempre relee el
+  estado completo de la OC en SAP —incluido el flag `Cancelled`— nunca aplica un delta)
+- Inserta directamente en `@GNA_AUR_REP_QUEUE` con `EntityType = 'PurchaseOrder'` y
+  `U_GNA_AUR_Operation = 'I'/'U'/'C'` según corresponda (valor solo informativo/auditoría:
+  el use case de C# no lo lee para decidir el flujo, usa el flag `Cancelled` de SAP)
 - ⚠️ Riesgo conocido (heredado del mismo patrón en `SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION`):
   el `Code` generado (`'PO-' || DocEntry || timestamp`) puede superar los 8 caracteres
   alfanuméricos documentados como máximo para la PK de UDTs en `copilot-instructions.md`
   (sección 8). Verificar el ancho real provisionado para `Code` en `@GNA_AUR_REP_QUEUE`
   antes de ir a producción con volumen — afecta a ambos SP por igual.
-- Cancelación de OC: **no implementada** (backlog)
 
 ### `SBO_SP_TransactionNotification`
 - Hook estándar de SAP B1
@@ -404,7 +419,7 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 | Archivo | Tests | Estado |
 |---|---|---|
 | `ArticleSyncUseCaseTests.cs` | 5 tests | ✅ Completos (happy path, create/update, error handling, CT propagation, propagación de excepción) |
-| `PurchaseOrderSyncUseCaseTests.cs` | 7 tests | ✅ Completos (5 mínimos + reconciliación add/edit/remove + omisión de líneas con `fulfilledQuantity > 0`) |
+| `PurchaseOrderSyncUseCaseTests.cs` | 9 tests | ✅ Completos (5 mínimos + reconciliación add/edit/remove + omisión de líneas con `fulfilledQuantity > 0` + cancelación existente/no-existente en Aurora) |
 | `EnsureReplicationSchemaUseCaseTests.cs` | 13 tests | ✅ Completos (incluye tabla/UDO de Banners y verificación de que no se le agregan UDFs) |
 
 ---
@@ -419,7 +434,7 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 
 ### Circuito de Órdenes de Compra — pendiente
 - [x] ~~Modificación de OC / líneas de OC en SAP → Aurora~~ — implementado como reconciliación de líneas (`add`/`edit`/`remove`), ver sección "Entidad `PurchaseOrder`"
-- [ ] Cancelación de OC en SAP → Aurora (`DELETE /aurora-erp/purchase-orders/{externalId}`)
+- [x] ~~Cancelación de OC en SAP → Aurora~~ — implementado vía flag `PurchaseOrder.Cancelled` + `CancelPurchaseOrderAsync` (`DELETE /aurora-erp/purchase-orders/{externalId}`), ver sección "Entidad `PurchaseOrder`". ⚠️ Verificar en el Service Layer real que el campo `Cancelled` de `PurchaseOrders` se comporta como se documentó (no probado contra una instancia SAP B1 real todavía)
 - [ ] Aviso de cambio de estado en OC (Aurora → SAP): requiere UDF en OPOR para reflejar estado/seguimiento (ver doc "Integración SAP B1 - Aurora Etapa1 CIRCUITOS")
 - [ ] Reporte de ingreso (Aurora → SAP): entrada de mercancías cumpliendo la OC
 - [ ] Definir si `bannerName`/`bannerExternalId`/`notes` de la OC deben mapearse desde algún campo/UDF de SAP (hoy se omiten; Aurora tampoco expone forma de actualizarlos post-creación en `purchase-orders`)
@@ -478,3 +493,6 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 | 2026-08-10 | `PurchaseOrderArticleStateDto` agregado (mapea la respuesta de `GET .../articles`) |
 | 2026-08-10 | `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION` actualizado para aceptar `transaction_type = 'U'` además de `'A'` |
 | 2026-08-10 | 2 tests nuevos de reconciliación agregados a `PurchaseOrderSyncUseCaseTests` (add/edit/remove, y omisión de líneas cumplidas) |
+| 2026-08-11 | Cancelación de OC (SAP → Aurora) implementada: `PurchaseOrder.Cancelled` (mapeado desde `OPOR.Cancelled` vía Service Layer), `PurchaseOrderSyncUseCase.CancelInAuroraAsync` (prioridad sobre Alta/Modificación), `IAuroraPurchaseOrderApiClient.CancelPurchaseOrderAsync`/`AuroraPurchaseOrderApiClient` (`DELETE /aurora-erp/purchase-orders/{externalId}`, idempotente ante 404) |
+| 2026-08-11 | `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION` actualizado para aceptar `transaction_type = 'C'` (Cancel), setea `U_GNA_AUR_Operation = 'C'` |
+| 2026-08-11 | 2 tests nuevos de cancelación agregados a `PurchaseOrderSyncUseCaseTests` (OC cancelada existente en Aurora, OC cancelada que nunca existió en Aurora) |

@@ -179,6 +179,59 @@ public sealed class PurchaseOrderSyncUseCaseTests
         _repositoryMock.Verify(r => r.MarkPurchaseOrderAsReplicatedAsync("6001", It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Fact(DisplayName = "⏺ Debe cancelar en Aurora una OC cancelada en SAP que ya existía allí")]
+    public async Task ExecuteAsync_ShouldCancelInAurora_WhenPurchaseOrderIsCancelledAndExists()
+    {
+        PurchaseOrder purchaseOrder = CreatePurchaseOrder(7001, cancelled: true, ("SKU-001", 10m));
+
+        _repositoryMock
+            .Setup(r => r.GetPendingPurchaseOrdersAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([purchaseOrder]);
+
+        _auroraApiMock
+            .Setup(c => c.GetPurchaseOrderByExternalIdAsync("7001", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AuroraPurchaseOrderDto { ExternalId = "7001", State = "PENDING" });
+
+        PurchaseOrderSyncUseCase useCase = CreateSut();
+
+        (int processed, int successful, int failed) result = await useCase.ExecuteAsync();
+
+        Assert.Equal(1, result.successful);
+        Assert.Equal(0, result.failed);
+
+        _auroraApiMock.Verify(c => c.CancelPurchaseOrderAsync("7001", null, It.IsAny<CancellationToken>()), Times.Once);
+        _auroraApiMock.Verify(c => c.CreatePurchaseOrderAsync(It.IsAny<CreateAuroraPurchaseOrderDto>(), null, It.IsAny<CancellationToken>()), Times.Never);
+        _auroraApiMock.Verify(c => c.GetPurchaseOrderArticlesAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Never);
+        _repositoryMock.Verify(r => r.MarkPurchaseOrderAsReplicatedAsync("7001", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact(DisplayName = "⏺ No debe llamar a Aurora para cancelar una OC que nunca existió allí")]
+    public async Task ExecuteAsync_ShouldNotCallCancel_WhenCancelledPurchaseOrderNeverExistedInAurora()
+    {
+        PurchaseOrder purchaseOrder = CreatePurchaseOrder(7002, cancelled: true, ("SKU-001", 10m));
+
+        _repositoryMock
+            .Setup(r => r.GetPendingPurchaseOrdersAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([purchaseOrder]);
+
+        _auroraApiMock
+            .Setup(c => c.GetPurchaseOrderByExternalIdAsync("7002", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AuroraPurchaseOrderDto?)null);
+
+        PurchaseOrderSyncUseCase useCase = CreateSut();
+
+        (int processed, int successful, int failed) result = await useCase.ExecuteAsync();
+
+        Assert.Equal(1, result.successful);
+        Assert.Equal(0, result.failed);
+
+        _auroraApiMock.Verify(c => c.CancelPurchaseOrderAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()), Times.Never);
+        _auroraApiMock.Verify(c => c.CreatePurchaseOrderAsync(It.IsAny<CreateAuroraPurchaseOrderDto>(), null, It.IsAny<CancellationToken>()), Times.Never);
+
+        // La OC nunca existió en Aurora: se trata como no-op exitoso, no como error.
+        _repositoryMock.Verify(r => r.MarkPurchaseOrderAsReplicatedAsync("7002", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     [Fact(DisplayName = "⏺ Debe manejar PurchaseOrderAuroraApiException")]
     public async Task ExecuteAsync_ShouldHandlePurchaseOrderAuroraApiException()
     {
@@ -252,10 +305,16 @@ public sealed class PurchaseOrderSyncUseCaseTests
         _repositoryMock.Verify(r => r.MarkPurchaseOrderAsReplicatedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-    private static PurchaseOrder CreatePurchaseOrder(int docEntry, params (string Sku, decimal Quantity)[] lines) => new()
+    private static PurchaseOrder CreatePurchaseOrder(
+        int docEntry, params (string Sku, decimal Quantity)[] lines)
+        => CreatePurchaseOrder(docEntry, cancelled: false, lines);
+
+    private static PurchaseOrder CreatePurchaseOrder(
+        int docEntry, bool cancelled, params (string Sku, decimal Quantity)[] lines) => new()
     {
         DocEntry = docEntry,
         DocNum = docEntry,
+        Cancelled = cancelled,
         Lines = [.. lines.Select((line, index) => new PurchaseOrderLine
         {
             LineOrder = index,

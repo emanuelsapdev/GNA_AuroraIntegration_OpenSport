@@ -71,6 +71,7 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
 
             string fields = $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocEntryField}," +
                             $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocNumField}," +
+                            $"{SapB1PurchaseOrdersConstants.PurchaseOrders.CancelledField}," +
                             $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocumentLinesField}";
 
             var resource = $"{SapB1PurchaseOrdersConstants.PurchaseOrders.Endpoint}?$filter={filter}" +
@@ -94,6 +95,8 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
     {
         DocEntry = dto.DocEntry,
         DocNum = dto.DocNum,
+        Cancelled = string.Equals(
+            dto.Cancelled, SapB1PurchaseOrdersConstants.PurchaseOrders.CancelledYesValue, StringComparison.OrdinalIgnoreCase),
         Lines = [.. dto.DocumentLines.Select(line => new PurchaseOrderLine
         {
             LineOrder = line.LineNum,
@@ -117,6 +120,10 @@ internal sealed class ServiceLayerPurchaseOrderDto
 {
     public int DocEntry { get; set; }
     public int? DocNum { get; set; }
+
+    /// <summary>"tYES"/"tNO" (BoYesNoEnum). Ver SapB1PurchaseOrdersConstants.CancelledField.</summary>
+    public string? Cancelled { get; set; }
+
     public List<ServiceLayerPurchaseOrderLineDto> DocumentLines { get; set; } = [];
 }
 
