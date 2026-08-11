@@ -101,9 +101,11 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Name = article.Name,
         Ean = article.PrimaryEan,
         Eans = MapEans(article.AdditionalEans),
-        //BrandExternalId = article.BrandID,
+        BrandExternalId = article.BrandID,
+        BrandName = article.BrandName,
         CategoryName = article.CategoryName,
         BannerExternalId = article.BannerID,
+        BannerName = article.BannerName,
         Bulky = article.IsBulky,
         Cage = article.IsCaged
     };
@@ -113,9 +115,11 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Sku = article.Sku,
         Name = article.Name,
         Eans = MapEans(article.AdditionalEans),
-        //BrandExternalId = article.BrandID,
+        BrandExternalId = article.BrandID,
+        BrandName = article.BrandName,
         CategoryName = article.CategoryName,
-        BannerExternalId = article.BannerID, 
+        BannerExternalId = article.BannerID,
+        BannerName = article.BannerName,
         Bulky = article.IsBulky,
         Cage = article.IsCaged
     };

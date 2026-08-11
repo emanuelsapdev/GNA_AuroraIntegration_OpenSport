@@ -164,6 +164,8 @@ src/
 │       │   └── ServiceLayerSettings.cs          ← BaseUrl, CompanyDB, UserName, Password
 │       ├── Constants/
 │       │   ├── SapB1ItemsConstants.cs           ← campos de Items (ItemCode, BarCode, U_GNA_AUR_*)
+│       │   ├── SapB1ProductBrandsConstants.cs   ← recurso U_GNA_AUR_MARCAS (Code/Name)
+│       │   ├── SapB1BannersConstants.cs         ← recurso U_GNA_AUR_BANNERS (Code/Name)
 │       │   ├── SapB1PurchaseOrdersConstants.cs  ← recurso PurchaseOrders (DocEntry, DocNum, DocumentLines)
 │       │   └── SapB1ReplicationConstants.cs     ← endpoints U_*, campos U_*, estados PENDING/REPLICATED/FAILED
 │       ├── Mapping/
@@ -192,7 +194,7 @@ src/
 
 tests/
 └── GNA.AuroraIntegration.Tests/
-    ├── ArticleSyncUseCaseTests.cs               ← 5 tests (todos implementados)
+    ├── ArticleSyncUseCaseTests.cs               ← 7 tests (todos implementados)
     ├── PurchaseOrderSyncUseCaseTests.cs         ← 9 tests (todos implementados)
     └── EnsureReplicationSchemaUseCaseTests.cs   ← tests del schema bootstrapper
 ```
@@ -217,15 +219,26 @@ Provisionado automáticamente al arrancar por `EnsureReplicationSchemaUseCase` �
 
 | Campo lógico | Nombre físico | Tipo | Descripción |
 |---|---|---|---|
-| `GNA_AUR_CatLog` | `U_GNA_AUR_CatLog` | Alpha(30) | Categoría Logística (linked a GNA_AUR_CATLOG) |
-| `GNA_AUR_Marca` | `U_GNA_AUR_Marca` | Alpha(30) | Marca (linked a GNA_AUR_MARCAS) |
+| `GNA_AUR_CatLog` | `U_GNA_AUR_CatLog` | Alpha(30) | Categoría Logística (linked a GNA_AUR_CATLOG — OITM guarda el `Code`, no el `Name`) |
+| `GNA_AUR_Marca` | `U_GNA_AUR_Marca` | Alpha(30) | Marca (linked a GNA_AUR_MARCAS — OITM guarda el `Code`, no el `Name`) |
 | `GNA_AUR_IsBulky` | `U_GNA_AUR_IsBulky` | Alpha(1) Y/N | Es Voluminoso (default "N") |
 | `GNA_AUR_IsCaged` | `U_GNA_AUR_IsCaged` | Alpha(1) Y/N | Es Enjaulado (default "N") |
-| `GNA_AUR_Banner` | `U_GNA_AUR_Banner` | Alpha(150) | Banner del artículo |
+| `GNA_AUR_Banner` | `U_GNA_AUR_Banner` | Alpha(30) | Banner (linked a GNA_AUR_BANNERS — OITM guarda el `Code`, no el `Name`. Cambiado de texto libre Alpha(150) a LinkedTable el 2026-08-11) |
 
-> **Nota:** Los campos que lee `ArticleServiceLayerLookupRepository` del recurso `Items` son:
-> `U_GNA_AUR_BannerID`, `U_GNA_AUR_BrandID`, `U_GNA_AUR_CategoryName`, `U_GNA_AUR_IsBulky`, `U_GNA_AUR_IsCaged`
-> (definidos en `SapB1ItemsConstants`). Verificar coherencia con los UDFs provisionados si se añaden campos.
+> **✅ Corregido (2026-08-11):** `SapB1ItemsConstants.Items` tenía 3 constantes que apuntaban a nombres
+> de campo que `EnsureReplicationSchemaUseCase` nunca provisionó (`U_GNA_AUR_BannerID`, `U_GNA_AUR_BrandID`,
+> `U_GNA_AUR_CategoryName`) — el bug que señalaba la nota anterior de esta sección. Ahora apuntan a los
+> UDFs reales: `BannerField = U_GNA_AUR_Banner`, `ProductBrandField = U_GNA_AUR_Marca`,
+> `LogisticsCategoryField = U_GNA_AUR_CatLog`. Ver también el bug relacionado de deserialización JSON
+> corregido en la sección "Entidad `Article`" más abajo.
+>
+> **⚠️ Cambio de diseño (2026-08-11):** `U_GNA_AUR_Banner` dejó de ser texto libre y pasó a ser
+> LinkedTable contra `GNA_AUR_BANNERS`, igual patrón que CatLog/Marca (Code ≤8 chars en OITM, Name
+> resuelto vía lookup). El cambio en `EnsureReplicationSchemaUseCase` (tamaño de campo 150→30 +
+> `linkedTable: ReplicationSchemaConstants.BannersTable.Name`) ya estaba hecho en el working
+> tree sin commitear al momento de este ticket; se confirmó con el usuario que es intencional y
+> se commitea junto con el resto de este cambio. `Article.BannerID`/`BannerName` y
+> `ArticleServiceLayerLookupRepository` se implementaron ya asumiendo este comportamiento.
 
 ### UDOs creados
 
@@ -265,13 +278,39 @@ Provisionado automáticamente al arrancar por `EnsureReplicationSchemaUseCase` �
 
 **Activos:**
 - `Sku`, `Name`, `PrimaryEan`, `AdditionalEans[]`
-- `CategoryName`, `BrandID`, `BannerID`
+- `CategoryName`, `BrandID`, `BrandName`, `BannerID`, `BannerName`
 - `IsBulky`, `IsCaged`
 
 **Comentados (disponibles en DTO pero no en uso):**
 - `WeightInGr`, `HeightInCm`, `WidthInCm`, `LengthInCm`
 - `Colour`, `Size`, `HasProductionBatch`, `HasDueDate`, `HasSerialNumber`, `IsConsumable`
-- `BrandName` (se usa `BrandID` pero `BrandExternalId` está comentado en el mapping de ArticleSyncUseCase)
+
+**`BannerID` / `BannerName` / `BrandID` / `BrandName` (2026-08-11 — antes no se seteaban al
+crear/actualizar artículos en Aurora, a pedido explícito del usuario):**
+- Banner y Marca son estructuralmente idénticos: ambos son UDFs LinkedTable en OITM
+  (`U_GNA_AUR_Banner` → `GNA_AUR_BANNERS`, `U_GNA_AUR_Marca` → `GNA_AUR_MARCAS`), así que OITM
+  solo guarda el **Code** (≤8 chars), nunca el Name. (Banner pasó de texto libre a LinkedTable el
+  mismo día — ver nota en "Esquema en SAP B1".)
+- `BannerID` / `BrandID`: el Code tal cual lo devuelve Service Layer. Se mapean a
+  `CreateAuroraArticleDto.BannerExternalId`/`BrandExternalId` (ídem en Update).
+- `BannerName` / `BrandName`: el Name resuelto **explícitamente** — Service Layer no expone las
+  UDFs LinkedTable como navigation properties OData, así que no hay `$expand`/cross-join de una
+  sola query que traiga Items + Name de Marca/Banner juntos.
+  `ArticleServiceLayerLookupRepository.GetNamesByCodeAsync` (método genérico, reutilizado para
+  ambas tablas) resuelve Code → Name con **una consulta batcheada por tabla, por corrida** (no
+  una por artículo): junta los Codes distintos del lote de Items ya traído y los resuelve en
+  lotes de `FilterBatchSize` (20) contra `U_GNA_AUR_MARCAS`/`U_GNA_AUR_BANNERS`
+  `?$filter=Code eq '...' or Code eq '...'`, igual patrón que usa `GetBySkuListAsync` para Items.
+  En el caso común (≤20 valores distintos de cada tabla por corrida) esto agrega **dos consultas
+  extra** al ciclo completo (una por Marca, una por Banner), no N+1. Nulo si el artículo no tiene
+  marca/banner asignado o el Code no matcheó ninguna fila de la tabla correspondiente.
+- **⚠️ Bug relacionado corregido en el mismo cambio:** `ServiceLayerItemDto` (DTO interno de
+  `ArticleServiceLayerLookupRepository`) no tenía `[JsonPropertyName]` en ninguna de sus propiedades
+  de UDF. Como `ServiceLayerClient` deserializa con `PropertyNamingPolicy = null` (match exacto,
+  case-sensitive), los campos `U_GNA_AUR_*` nunca podían bindear contra propiedades como `BrandID`
+  o `CategoryName` — quedaban silenciosamente en `null` aunque Service Layer sí los devolviera.
+  Corregido agregando `[JsonPropertyName(SapB1ItemsConstants.Items.XxxField)]` explícito a cada
+  propiedad de UDF del DTO.
 
 ---
 
@@ -418,7 +457,7 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 
 | Archivo | Tests | Estado |
 |---|---|---|
-| `ArticleSyncUseCaseTests.cs` | 5 tests | ✅ Completos (happy path, create/update, error handling, CT propagation, propagación de excepción) |
+| `ArticleSyncUseCaseTests.cs` | 7 tests | ✅ Completos (happy path, create/update, error handling, CT propagation, propagación de excepción + mapping de bannerName/brandExternalId/brandName en create y update) |
 | `PurchaseOrderSyncUseCaseTests.cs` | 9 tests | ✅ Completos (5 mínimos + reconciliación add/edit/remove + omisión de líneas con `fulfilledQuantity > 0` + cancelación existente/no-existente en Aurora) |
 | `EnsureReplicationSchemaUseCaseTests.cs` | 13 tests | ✅ Completos (incluye tabla/UDO de Banners y verificación de que no se le agregan UDFs) |
 
@@ -442,9 +481,10 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 - [ ] Validar con el cliente/Aurora el criterio de "línea ya cumplida" (`fulfilledQuantity > 0` bloquea edit/remove): confirmar que ese es el comportamiento deseado ante una modificación en SAP sobre una línea parcialmente recibida
 
 ### Menores / mejoras técnicas (de `copilot-instructions.md` sección 9)
-- [ ] `BrandExternalId` está comentado en `ArticleSyncUseCase` mapping (líneas 104 y 117). Definir si Aurora lo requiere
-- [ ] Verificar coherencia entre campos que lee `ArticleServiceLayerLookupRepository` (`U_GNA_AUR_BannerID`, etc.) y los UDFs provisionados por `EnsureReplicationSchemaUseCase` (que usa `U_GNA_AUR_Banner`)
+- [x] ~~`BrandExternalId` está comentado en `ArticleSyncUseCase` mapping~~ — descomentado y con `BrandName`/`BannerName` agregados (2026-08-11), ver sección "Entidad `Article`"
+- [x] ~~Verificar coherencia entre campos que lee `ArticleServiceLayerLookupRepository` (`U_GNA_AUR_BannerID`, etc.) y los UDFs provisionados por `EnsureReplicationSchemaUseCase`~~ — corregido (2026-08-11), ver nota en "Esquema en SAP B1" y sección "Entidad `Article`"
 - [ ] `EnsureUserFieldAsync` swallows excepciones con `LogWarning` en lugar de relanzar — revisar si es intencional
+- [ ] ⚠️ Sin probar contra una instancia SAP B1/Service Layer real: confirmar en `$metadata` que `U_GNA_AUR_MARCAS`/`U_GNA_AUR_BANNERS` exponen `Code`/`Name` como campos estándar de UDT y que el `$filter "or"` batcheado de `GetNamesByCodeAsync` funciona igual que el ya usado para Items
 - [ ] `LogisticsCategorySyncUseCaseLoggingDecorator` y `ProductBrandsSyncUseCaseDecorator` existen pero los use cases subyacentes son stubs
 - [ ] Añadir jobs de Quartz para `LogisticsCategory` y `ProductBrands` cuando los use cases estén implementados
 - [ ] Verificar ancho real de la columna `Code` en `@GNA_AUR_REP_QUEUE` vs. el `Code` largo generado por ambos SP de encolado (ver nota en sección de Stored Procedures)
@@ -496,3 +536,9 @@ Ubicación en repo: `src/GNA.AuroraIntegration.Infrastructure/Requireds/`
 | 2026-08-11 | Cancelación de OC (SAP → Aurora) implementada: `PurchaseOrder.Cancelled` (mapeado desde `OPOR.Cancelled` vía Service Layer), `PurchaseOrderSyncUseCase.CancelInAuroraAsync` (prioridad sobre Alta/Modificación), `IAuroraPurchaseOrderApiClient.CancelPurchaseOrderAsync`/`AuroraPurchaseOrderApiClient` (`DELETE /aurora-erp/purchase-orders/{externalId}`, idempotente ante 404) |
 | 2026-08-11 | `SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION` actualizado para aceptar `transaction_type = 'C'` (Cancel), setea `U_GNA_AUR_Operation = 'C'` |
 | 2026-08-11 | 2 tests nuevos de cancelación agregados a `PurchaseOrderSyncUseCaseTests` (OC cancelada existente en Aurora, OC cancelada que nunca existió en Aurora) |
+| 2026-08-11 | **Datos de artículos completados**, a pedido explícito del usuario: `Article.BannerID`/`BannerName` y `Article.BrandID`/`BrandName` ahora se setean al crear/actualizar en Aurora — antes se enviaban sin `bannerExternalId`/`bannerName`/`brandExternalId`/`brandName` |
+| 2026-08-11 | Corregido `SapB1ItemsConstants.Items`: 3 constantes apuntaban a UDFs que `EnsureReplicationSchemaUseCase` nunca provisiona (bug preexistente, ya señalado como TODO). Renombradas y corregidas: `BannerField = U_GNA_AUR_Banner`, `ProductBrandField = U_GNA_AUR_Marca`, `LogisticsCategoryField = U_GNA_AUR_CatLog` |
+| 2026-08-11 | Corregido bug de deserialización en `ServiceLayerItemDto`: faltaban `[JsonPropertyName]` en las propiedades de UDF, por lo que Service Layer nunca lograba bindear `U_GNA_AUR_*` contra el DTO (`PropertyNamingPolicy = null` exige match exacto) |
+| 2026-08-11 | `U_GNA_AUR_Banner` pasó de texto libre (Alpha 150) a LinkedTable contra `GNA_AUR_BANNERS` (Alpha 30, igual patrón que CatLog/Marca) en `EnsureReplicationSchemaUseCase` — cambio hecho localmente por el usuario, confirmado como intencional y commiteado en este mismo cambio |
+| 2026-08-11 | `ArticleServiceLayerLookupRepository.GetNamesByCodeAsync` agregado (método genérico, reemplaza el antes específico `GetBrandNamesByCodeAsync`): resuelve Code → Name contra `U_GNA_AUR_MARCAS` y `U_GNA_AUR_BANNERS` en una consulta batcheada por tabla por corrida (no N+1), reutilizando el patrón `$filter "or"` en lotes de 20 ya usado para Items. Nuevas constantes `SapB1ProductBrandsConstants` y `SapB1BannersConstants` |
+| 2026-08-11 | 2 tests nuevos agregados a `ArticleSyncUseCaseTests` verificando el mapeo de `bannerExternalId`/`bannerName`/`brandExternalId`/`brandName` hacia Aurora en create y update |

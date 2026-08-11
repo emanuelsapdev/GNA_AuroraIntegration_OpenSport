@@ -149,6 +149,61 @@ public sealed class ArticleSyncUseCaseTests
         _repositoryMock.Verify(r => r.MarkArticleAsReplicatedAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact(DisplayName = "⏺ Debe mapear bannerExternalId, bannerName, brandExternalId y brandName al crear un artículo en Aurora")]
+    public async Task ExecuteAsync_ShouldMapBannerAndBrandFields_OnCreate()
+    {
+        Article article = CreateArticle("A010");
+
+        _repositoryMock
+            .Setup(r => r.GetPendingArticlesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([article]);
+
+        _auroraApiMock
+            .Setup(c => c.GetArticleBySkuAsync("A010", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((AuroraArticleDto?)null);
+
+        ArticleSyncUseCase useCase = CreateSut();
+
+        await useCase.ExecuteAsync();
+
+        _auroraApiMock.Verify(c => c.CreateArticleAsync(
+            It.Is<CreateAuroraArticleDto>(dto =>
+                dto.BannerExternalId == article.BannerID &&
+                dto.BannerName == article.BannerName &&
+                dto.BrandExternalId == article.BrandID &&
+                dto.BrandName == article.BrandName),
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact(DisplayName = "⏺ Debe mapear bannerExternalId, bannerName, brandExternalId y brandName al actualizar un artículo en Aurora")]
+    public async Task ExecuteAsync_ShouldMapBannerAndBrandFields_OnUpdate()
+    {
+        Article article = CreateArticle("A011");
+
+        _repositoryMock
+            .Setup(r => r.GetPendingArticlesAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([article]);
+
+        _auroraApiMock
+            .Setup(c => c.GetArticleBySkuAsync("A011", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AuroraArticleDto { Sku = "A011", Name = "Artículo A011" });
+
+        ArticleSyncUseCase useCase = CreateSut();
+
+        await useCase.ExecuteAsync();
+
+        _auroraApiMock.Verify(c => c.UpdateArticleAsync(
+            "A011",
+            It.Is<UpdateAuroraArticleDto>(dto =>
+                dto.BannerExternalId == article.BannerID &&
+                dto.BannerName == article.BannerName &&
+                dto.BrandExternalId == article.BrandID &&
+                dto.BrandName == article.BrandName),
+            null,
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private static Article CreateArticle(string sku) => new()
     {
         Sku = sku,
@@ -156,8 +211,10 @@ public sealed class ArticleSyncUseCaseTests
         PrimaryEan = "1234567890123",
         AdditionalEans = [],
         CategoryName = "Categoría de prueba",
-        BrandID = "MarcaDePrueba",
-        BannerID = "BannerDePrueba",
+        BrandID = "MAR001",
+        BrandName = "Marca de Prueba",
+        BannerID = "BAN001",
+        BannerName = "Banner de Prueba",
         IsBulky = false,
         IsCaged = false
         //WeightInGr = 100,
