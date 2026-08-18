@@ -12,6 +12,6 @@ public enum ReplicableEntityType
     SalesOrder = 2,
     ReturnOrder = 3,
     TransferInOrder = 4,
-    TransferOutOrder = 5,
+    InventoryTransferRequest = 5, 
     Inventory = 6
 }

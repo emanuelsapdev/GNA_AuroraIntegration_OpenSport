@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 
 /// <summary>
 /// Body de POST /aurora-erp/purchase-orders.

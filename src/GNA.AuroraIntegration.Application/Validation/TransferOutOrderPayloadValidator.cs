@@ -1,12 +1,12 @@
 using System.ComponentModel.DataAnnotations;
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 using GNA.AuroraIntegration.Domain.Exceptions;
 
 namespace GNA.AuroraIntegration.Application.Validation;
 
-public sealed class TransferOutOrderPayloadValidator : ITransferOutOrderPayloadValidator
+public sealed class InventoryTransferRequestPayloadValidator : IInventoryTransferRequestPayloadValidator
 {
-    public void Validate(CreateAuroraTransferOutOrderDto payload)
+    public void Validate(CreateAuroraInventoryTransferRequestDto payload)
     {
         ValidationContext context = new(payload);
         var validationResults = new List<ValidationResult>();

@@ -1,4 +1,4 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 using GNA.AuroraIntegration.Application.Validation;
@@ -12,7 +12,7 @@ namespace GNA.AuroraIntegration.Application.UseCases.Outbound;
 /// Caso de uso: toma Solicitudes de Traslado pendientes de SAP B1 (Alta, Modificación o
 /// Cancelación) y las refleja en Aurora WMS como "transfer out orders".
 ///
-/// - Si la orden está cancelada en SAP (TransferOutOrder.Cancelled, ver
+/// - Si la orden está cancelada en SAP (InventoryTransferRequest.Cancelled, ver
 ///   InventoryTransferRequestServiceLayerLookupRepository): se cancela en Aurora (DELETE), o
 ///   no se hace nada si nunca llegó a existir allí. Esta rama tiene prioridad sobre
 ///   Alta/Modificación: una orden cancelada nunca se crea ni se reconcilia, sin importar con
@@ -39,22 +39,22 @@ namespace GNA.AuroraIntegration.Application.UseCases.Outbound;
 ///     de purchase-orders), pero documenta una precondición de estado ("Estado de la orden ->
 ///     PENDIENTE, CONGELADA. Utilizar estado TO_EDIT para modificar el pedido.") sin que exista
 ///     hoy una definición de negocio sobre cuándo disparar esa transición — no se implementa
-///     para no inventar ese comportamiento. Ver IAuroraTransferOutOrderApiClient.UpdateTransferOutOrderHeaderAsync.
+///     para no inventar ese comportamiento. Ver IAuroraInventoryTransferRequestApiClient.UpdateInventoryTransferRequestHeaderAsync.
 ///   - logisticOperatorExternalId/postalCode/shippingPriorityExternalId en la creación: sin
-///     campo SAP (OWTQ) mapeado hoy — ver CreateAuroraTransferOutOrderDto.
+///     campo SAP (OWTQ) mapeado hoy — ver CreateAuroraInventoryTransferRequestDto.
 /// </summary>
-public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
+public sealed class InventoryTransferRequestSyncUseCase : IInventoryTransferRequestSyncUseCase
 {
-    private readonly ITransferOutOrderReplicationRepository _repository;
-    private readonly IAuroraTransferOutOrderApiClient _auroraClient;
-    private readonly ITransferOutOrderPayloadValidator _validator;
-    private readonly ILogger<TransferOutOrderSyncUseCase> _logger;
+    private readonly IInventoryTransferRequestReplicationRepository _repository;
+    private readonly IAuroraInventoryTransferRequestApiClient _auroraClient;
+    private readonly IInventoryTransferRequestPayloadValidator _validator;
+    private readonly ILogger<InventoryTransferRequestSyncUseCase> _logger;
 
-    public TransferOutOrderSyncUseCase(
-        ITransferOutOrderReplicationRepository repository,
-        IAuroraTransferOutOrderApiClient auroraClient,
-        ITransferOutOrderPayloadValidator validator,
-        ILogger<TransferOutOrderSyncUseCase> logger)
+    public InventoryTransferRequestSyncUseCase(
+        IInventoryTransferRequestReplicationRepository repository,
+        IAuroraInventoryTransferRequestApiClient auroraClient,
+        IInventoryTransferRequestPayloadValidator validator,
+        ILogger<InventoryTransferRequestSyncUseCase> logger)
     {
         _repository = repository;
         _auroraClient = auroraClient;
@@ -70,39 +70,43 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
 
         try
         {
-            IReadOnlyList<TransferOutOrder> pending = await _repository.GetPendingTransferOutOrdersAsync(batchSize: 100, ct);
+            IReadOnlyList<InventoryTransferRequest> pending = await _repository.GetPendingInventoryTransferRequestAsync(batchSize: 100, ct);
 
-            foreach (TransferOutOrder transferOutOrder in pending)
+            foreach (InventoryTransferRequest InventoryTransferRequest in pending)
             {
                 processed++;
                 ct.ThrowIfCancellationRequested();
 
-                string docEntry = transferOutOrder.DocEntry.ToString();
+                string docEntry = InventoryTransferRequest.DocEntry.ToString();
 
                 try
                 {
-                    if (transferOutOrder.Cancelled)
+                    if (InventoryTransferRequest.Cancelled)
                     {
                         await CancelInAuroraAsync(docEntry, ct);
+                        _logger.LogInformation("Solicitud de Traslado '{DocEntry}' cancelada en Aurora.", docEntry);
+
                     }
                     else
                     {
-                        AuroraTransferOutOrderDto? existing = await _auroraClient.GetTransferOutOrderByExternalIdAsync(docEntry, warehouse: null, ct);
+                        AuroraInventoryTransferRequestDto? existing = await _auroraClient.GetInventoryTransferRequestByExternalIdAsync(docEntry, warehouse: null, ct);
 
                         if (existing is null)
                         {
-                            CreateAuroraTransferOutOrderDto createDto = MapToCreateDto(transferOutOrder);
+                            CreateAuroraInventoryTransferRequestDto createDto = MapToCreateDto(InventoryTransferRequest);
                             _validator.Validate(createDto);
-                            await _auroraClient.CreateTransferOutOrderAsync(createDto, warehouse: null, ct);
+                            await _auroraClient.CreateInventoryTransferRequestAsync(createDto, warehouse: null, ct);
                             _logger.LogInformation("Solicitud de Traslado '{DocEntry}' creada en Aurora.", docEntry);
                         }
                         else
                         {
-                            await ReconcileLinesAsync(docEntry, transferOutOrder.Lines, ct);
+                            await ReconcileLinesAsync(docEntry, InventoryTransferRequest.Lines, ct);
+                            _logger.LogInformation("Líneas de Solicitud de Traslado '{DocEntry}' conciliada en Aurora.", docEntry);
+
                         }
                     }
 
-                    await _repository.MarkTransferOutOrderAsReplicatedAsync(docEntry, ct);
+                    await _repository.MarkInventoryTransferRequestAsReplicatedAsync(docEntry, ct);
                     successful++;
                 }
                 catch (OperationCanceledException)
@@ -112,7 +116,7 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error replicando Solicitud de Traslado '{DocEntry}'", docEntry);
-                    await _repository.MarkTransferOutOrderAsFailedAsync(docEntry, ex.Message, ct);
+                    await _repository.MarkInventoryTransferRequestAsFailedAsync(docEntry, ex.Message, ct);
                     failed++;
                 }
             }
@@ -137,7 +141,7 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
     /// </summary>
     private async Task CancelInAuroraAsync(string externalId, CancellationToken ct)
     {
-        AuroraTransferOutOrderDto? existing = await _auroraClient.GetTransferOutOrderByExternalIdAsync(externalId, warehouse: null, ct);
+        AuroraInventoryTransferRequestDto? existing = await _auroraClient.GetInventoryTransferRequestByExternalIdAsync(externalId, warehouse: null, ct);
 
         if (existing is null)
         {
@@ -146,7 +150,7 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
             return;
         }
 
-        await _auroraClient.CancelTransferOutOrderAsync(externalId, warehouse: null, ct);
+        await _auroraClient.CancelInventoryTransferRequestAsync(externalId, warehouse: null, ct);
         _logger.LogInformation("Solicitud de Traslado '{ExternalId}' cancelada en Aurora.", externalId);
     }
 
@@ -156,12 +160,12 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
     /// entrada de la cola quedó marcada como 'I' o 'U': el resultado final refleja el SAP de
     /// hoy, salvo la limitación de líneas nuevas descripta abajo.
     /// </summary>
-    private async Task ReconcileLinesAsync(string externalId, IReadOnlyList<TransferOutOrderLine> sapLines, CancellationToken ct)
+    private async Task ReconcileLinesAsync(string externalId, IReadOnlyList<InventoryTransferRequestLine> sapLines, CancellationToken ct)
     {
-        IReadOnlyList<TransferOutOrderArticleStateDto> auroraLines =
-            await _auroraClient.GetTransferOutOrderArticlesAsync(externalId, warehouse: null, ct);
+        IReadOnlyList<InventoryTransferRequestArticleStateDto> auroraLines =
+            await _auroraClient.GetInventoryTransferRequestArticlesAsync(externalId, warehouse: null, ct);
 
-        Dictionary<string, TransferOutOrderArticleStateDto> auroraBySku =
+        Dictionary<string, InventoryTransferRequestArticleStateDto> auroraBySku =
             auroraLines.ToDictionary(line => line.ArticleSku, StringComparer.OrdinalIgnoreCase);
         HashSet<string> sapSkus = new(sapLines.Select(line => line.ArticleSku), StringComparer.OrdinalIgnoreCase);
 
@@ -169,7 +173,7 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
         // ⚠️ Limitación de la API de Aurora (no de negocio): transfer-out-orders no expone un
         // POST .../articles para agregar líneas a una orden existente. Se loguea y se omite —
         // ver el comentario de clase para el detalle completo.
-        List<TransferOutOrderLine> newLines = [.. sapLines.Where(line => !auroraBySku.ContainsKey(line.ArticleSku))];
+        List<InventoryTransferRequestLine> newLines = [.. sapLines.Where(line => !auroraBySku.ContainsKey(line.ArticleSku))];
         if (newLines.Count > 0)
         {
             _logger.LogWarning(
@@ -178,9 +182,9 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
         }
 
         // 2) Líneas presentes en ambos lados con cantidad distinta.
-        foreach (TransferOutOrderLine sapLine in sapLines)
+        foreach (InventoryTransferRequestLine sapLine in sapLines)
         {
-            if (!auroraBySku.TryGetValue(sapLine.ArticleSku, out TransferOutOrderArticleStateDto? auroraLine))
+            if (!auroraBySku.TryGetValue(sapLine.ArticleSku, out InventoryTransferRequestArticleStateDto? auroraLine))
             {
                 continue; // línea nueva, ya cubierta (y advertida) en el paso 1
             }
@@ -199,14 +203,14 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
                 continue;
             }
 
-            await _auroraClient.UpdateTransferOutOrderArticleAsync(externalId, sapLine.ArticleSku, MapLine(sapLine), warehouse: null, ct);
+            await _auroraClient.UpdateInventoryTransferRequestArticleAsync(externalId, sapLine.ArticleSku, MapLine(sapLine), warehouse: null, ct);
             _logger.LogInformation(
                 "Solicitud de Traslado '{ExternalId}': línea '{Sku}' actualizada a cantidad {Quantity} en Aurora.",
                 externalId, sapLine.ArticleSku, sapQuantity);
         }
 
         // 3) Líneas que Aurora tiene pero que ya no están en SAP.
-        foreach (TransferOutOrderArticleStateDto auroraLine in auroraLines)
+        foreach (InventoryTransferRequestArticleStateDto auroraLine in auroraLines)
         {
             if (sapSkus.Contains(auroraLine.ArticleSku))
             {
@@ -221,23 +225,23 @@ public sealed class TransferOutOrderSyncUseCase : ITransferOutOrderSyncUseCase
                 continue;
             }
 
-            await _auroraClient.RemoveTransferOutOrderArticleAsync(externalId, auroraLine.ArticleSku, warehouse: null, ct);
+            await _auroraClient.RemoveInventoryTransferRequestArticleAsync(externalId, auroraLine.ArticleSku, warehouse: null, ct);
             _logger.LogInformation("Solicitud de Traslado '{ExternalId}': línea '{Sku}' eliminada en Aurora.", externalId, auroraLine.ArticleSku);
         }
     }
 
-    private static CreateAuroraTransferOutOrderDto MapToCreateDto(TransferOutOrder transferOutOrder) => new()
+    private static CreateAuroraInventoryTransferRequestDto MapToCreateDto(InventoryTransferRequest InventoryTransferRequest) => new()
     {
-        ExternalId = transferOutOrder.DocEntry.ToString(),
-        BannerName = transferOutOrder.BannerName,
-        BannerExternalId = transferOutOrder.BannerExternalId,
-        Notes = transferOutOrder.Notes,
-        Articles = [.. transferOutOrder.Lines.Select(MapLine)]
+        ExternalId = InventoryTransferRequest.DocEntry.ToString(),
+        BannerName = InventoryTransferRequest.BannerName,
+        BannerExternalId = InventoryTransferRequest.BannerExternalId,
+        Notes = InventoryTransferRequest.Notes,
+        Articles = [.. InventoryTransferRequest.Lines.Select(MapLine)]
     };
 
-    private static TransferOutOrderArticleDto MapLine(TransferOutOrderLine line) => new()
+    private static InventoryTransferRequestArticleDto MapLine(InventoryTransferRequestLine line) => new()
     {
-        LineOrder = line.LineOrder,
+        LineOrder = line.LineOrder + 1,
         ArticleSku = line.ArticleSku,
         Quantity = ToAuroraQuantity(line.Quantity)
     };

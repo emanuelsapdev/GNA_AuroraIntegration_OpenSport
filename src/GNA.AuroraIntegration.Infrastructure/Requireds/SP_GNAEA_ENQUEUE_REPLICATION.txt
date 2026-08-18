@@ -1,0 +1,50 @@
+﻿ALTER PROCEDURE SP_GNAEA_ENQUEUE_REPLICAT(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+	out error_code    INT,
+    out error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+
+	-- OITM -> Articulos
+	CALL SP_GNAEA_ENQUEUE_ITEMS_REPLICATION(
+	:object_type,
+	:transaction_type,
+	:num_of_cols_in_key,
+	:list_of_key_cols_tab_del,
+	:list_of_cols_val_tab_del,
+	error_code,
+	error_message
+	);
+    
+	-- OPOR -> Pedido de Compra
+	CALL SP_GNAEA_ENQUEUE_PURCHASE_ORDER_REPLICATION(
+	:object_type,
+	:transaction_type,
+	:num_of_cols_in_key,
+	:list_of_key_cols_tab_del,
+	:list_of_cols_val_tab_del,
+	error_code,
+	error_message
+	);
+	
+	-- OWTQ -> Solicitud de Traslado
+	CALL SP_GNAEA_ENQUEUE_INVENTORY_TRANSFER_REQUESTS_REPLICATION(
+	:object_type,
+	:transaction_type,
+	:num_of_cols_in_key,
+	:list_of_key_cols_tab_del,
+	:list_of_cols_val_tab_del,
+	error_code,
+	error_message
+	);
+	
+	SELECT :error_code, :error_message FROM DUMMY;
+	RETURN;
+
+END;

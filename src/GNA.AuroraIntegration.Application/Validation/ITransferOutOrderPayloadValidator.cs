@@ -1,8 +1,8 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 
 namespace GNA.AuroraIntegration.Application.Validation;
 
-public interface ITransferOutOrderPayloadValidator
+public interface IInventoryTransferRequestPayloadValidator
 {
-    void Validate(CreateAuroraTransferOutOrderDto payload);
+    void Validate(CreateAuroraInventoryTransferRequestDto payload);
 }

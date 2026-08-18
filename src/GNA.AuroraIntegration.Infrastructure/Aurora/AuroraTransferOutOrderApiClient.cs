@@ -1,4 +1,4 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -17,19 +17,19 @@ namespace GNA.AuroraIntegration.Infrastructure.Aurora;
 ///
 /// ⚠️ A diferencia de AuroraPurchaseOrderApiClient, este cliente NO expone un método de
 /// "agregar artículos": la API de Aurora no tiene POST .../transfer-out-orders/{externalId}/articles.
-/// Sí expone, en cambio, UpdateTransferOutOrderHeaderAsync (PATCH de cabecera), que
-/// purchase-orders no tiene — ver comentario en IAuroraTransferOutOrderApiClient.
+/// Sí expone, en cambio, UpdateInventoryTransferRequestHeaderAsync (PATCH de cabecera), que
+/// purchase-orders no tiene — ver comentario en IAuroraInventoryTransferRequestApiClient.
 /// </summary>
-public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApiClient
+public sealed class AuroraInventoryTransferRequestApiClient : IAuroraInventoryTransferRequestApiClient
 {
     private const string Endpoint = "aurora-erp/transfer-out-orders";
 
     private readonly RestClient _client;
     private readonly AsyncPolicy _resiliencePolicy;
-    private readonly ILogger<AuroraTransferOutOrderApiClient> _logger;
+    private readonly ILogger<AuroraInventoryTransferRequestApiClient> _logger;
     private readonly string? _defaultWarehouse;
 
-    public AuroraTransferOutOrderApiClient(IOptions<AuroraApiSettings> settings, ILogger<AuroraTransferOutOrderApiClient> logger)
+    public AuroraInventoryTransferRequestApiClient(IOptions<AuroraApiSettings> settings, ILogger<AuroraInventoryTransferRequestApiClient> logger)
     {
         _logger = logger;
 
@@ -63,13 +63,13 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         _resiliencePolicy = Policy.WrapAsync(retryPolicy, circuitBreakerPolicy);
     }
 
-    public async Task CreateTransferOutOrderAsync(CreateAuroraTransferOutOrderDto transferOutOrder, string? warehouse, CancellationToken ct = default)
+    public async Task CreateInventoryTransferRequestAsync(CreateAuroraInventoryTransferRequestDto InventoryTransferRequest, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new(Endpoint, Method.Post);
 
         AddWarehouseParameter(request, warehouse);
 
-        var json = JsonSerializer.Serialize(transferOutOrder);
+        var json = JsonSerializer.Serialize(InventoryTransferRequest);
         request.AddJsonBody(json);
 
         RestResponse response;
@@ -85,24 +85,25 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex,
-                "Error de transporte creando Solicitud de Traslado '{ExternalId}' en Aurora.", transferOutOrder.ExternalId);
+                "Error de transporte creando Solicitud de Traslado '{ExternalId}' en Aurora.", InventoryTransferRequest.ExternalId);
 
-            throw new TransferOutOrderAuroraApiException(
-                transferOutOrder.ExternalId, $"Error de conexión al crear la Solicitud de Traslado '{transferOutOrder.ExternalId}' en Aurora.", ex);
+            throw new InventoryTransferRequestAuroraApiException(
+                InventoryTransferRequest.ExternalId, $"Error de conexión al crear la Solicitud de Traslado '{InventoryTransferRequest.ExternalId}' en Aurora.", ex);
         }
 
         if (!response.IsSuccessful)
         {
             _logger.LogError(
                 "Aurora API error {StatusCode} creando Solicitud de Traslado '{ExternalId}': {Body}",
-                response.StatusCode, transferOutOrder.ExternalId, response.Content);
+                response.StatusCode, InventoryTransferRequest.ExternalId, response.Content);
 
-            throw new TransferOutOrderAuroraApiException(
-                transferOutOrder.ExternalId, $"Error creando Solicitud de Traslado {transferOutOrder.ExternalId}: {response.StatusCode}");
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(
+                InventoryTransferRequest.ExternalId, $"[POST] Error creando Solicitud de Traslado {InventoryTransferRequest.ExternalId}: {auroraMessage}");
         }
     }
 
-    public async Task<AuroraTransferOutOrderDto?> GetTransferOutOrderByExternalIdAsync(string externalId, string? warehouse, CancellationToken ct = default)
+    public async Task<AuroraInventoryTransferRequestDto?> GetInventoryTransferRequestByExternalIdAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}", Method.Get);
         AddWarehouseParameter(request, warehouse);
@@ -121,7 +122,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte obteniendo Solicitud de Traslado '{ExternalId}' en Aurora.", externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al obtener la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -135,13 +136,15 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} obteniendo Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error obteniendo Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[GET] Error obteniendo Solicitud de Traslado {externalId}: {auroraMessage}");
         }
 
-        return JsonSerializer.Deserialize<AuroraTransferOutOrderDto?>(response.Content ?? string.Empty);
+        return JsonSerializer.Deserialize<AuroraInventoryTransferRequestDto?>(response.Content ?? string.Empty);
     }
 
-    public async Task<IReadOnlyList<TransferOutOrderArticleStateDto>> GetTransferOutOrderArticlesAsync(string externalId, string? warehouse, CancellationToken ct = default)
+    public async Task<IReadOnlyList<InventoryTransferRequestArticleStateDto>> GetInventoryTransferRequestArticlesAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}/articles", Method.Get);
         AddWarehouseParameter(request, warehouse);
@@ -160,7 +163,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte obteniendo líneas de la Solicitud de Traslado '{ExternalId}' en Aurora.", externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al obtener líneas de la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -174,13 +177,15 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} obteniendo líneas de la Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error obteniendo líneas de la Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[GET] Error obteniendo líneas de la Solicitud de Traslado {externalId}: {auroraMessage}");
         }
 
-        return JsonSerializer.Deserialize<List<TransferOutOrderArticleStateDto>>(response.Content ?? "[]") ?? [];
+        return JsonSerializer.Deserialize<List<InventoryTransferRequestArticleStateDto>>(response.Content ?? "[]") ?? [];
     }
 
-    public async Task UpdateTransferOutOrderArticleAsync(string externalId, string articleSku, TransferOutOrderArticleDto article, string? warehouse, CancellationToken ct = default)
+    public async Task UpdateInventoryTransferRequestArticleAsync(string externalId, string articleSku, InventoryTransferRequestArticleDto article, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}/articles/{articleSku}", Method.Patch);
         AddWarehouseParameter(request, warehouse);
@@ -200,7 +205,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte editando línea '{Sku}' de la Solicitud de Traslado '{ExternalId}' en Aurora.", articleSku, externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al editar la línea '{articleSku}' de la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -209,11 +214,13 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} editando línea '{Sku}' de la Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, articleSku, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error editando línea '{articleSku}' de la Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[PATCH] Error editando línea '{articleSku}' de la Solicitud de Traslado {externalId}: {auroraMessage}");
         }
     }
 
-    public async Task RemoveTransferOutOrderArticleAsync(string externalId, string articleSku, string? warehouse, CancellationToken ct = default)
+    public async Task RemoveInventoryTransferRequestArticleAsync(string externalId, string articleSku, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}/articles/{articleSku}", Method.Delete);
         AddWarehouseParameter(request, warehouse);
@@ -232,7 +239,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte eliminando línea '{Sku}' de la Solicitud de Traslado '{ExternalId}' en Aurora.", articleSku, externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al eliminar la línea '{articleSku}' de la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -247,11 +254,13 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} eliminando línea '{Sku}' de la Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, articleSku, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error eliminando línea '{articleSku}' de la Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[DELETE] Error eliminando línea '{articleSku}' de la Solicitud de Traslado {externalId}: {auroraMessage}");
         }
     }
 
-    public async Task CancelTransferOutOrderAsync(string externalId, string? warehouse, CancellationToken ct = default)
+    public async Task CancelInventoryTransferRequestAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}", Method.Delete);
         AddWarehouseParameter(request, warehouse);
@@ -270,7 +279,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte cancelando Solicitud de Traslado '{ExternalId}' en Aurora.", externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al cancelar la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -286,11 +295,13 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} cancelando Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error cancelando Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[DELETE] Error cancelando Solicitud de Traslado {externalId}: {auroraMessage}");
         }
     }
 
-    public async Task UpdateTransferOutOrderHeaderAsync(string externalId, UpdateAuroraTransferOutOrderDto header, string? warehouse, CancellationToken ct = default)
+    public async Task UpdateInventoryTransferRequestHeaderAsync(string externalId, UpdateAuroraInventoryTransferRequestDto header, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}", Method.Patch);
         AddWarehouseParameter(request, warehouse);
@@ -310,7 +321,7 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
         {
             _logger.LogError(ex,
                 "Error de transporte modificando cabecera de la Solicitud de Traslado '{ExternalId}' en Aurora.", externalId);
-            throw new TransferOutOrderAuroraApiException(
+            throw new InventoryTransferRequestAuroraApiException(
                 externalId, $"Error de conexión al modificar la cabecera de la Solicitud de Traslado '{externalId}' en Aurora.", ex);
         }
 
@@ -319,7 +330,9 @@ public sealed class AuroraTransferOutOrderApiClient : IAuroraTransferOutOrderApi
             _logger.LogError(
                 "Aurora API error {StatusCode} modificando cabecera de la Solicitud de Traslado '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new TransferOutOrderAuroraApiException(externalId, $"Error modificando cabecera de la Solicitud de Traslado {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new InventoryTransferRequestAuroraApiException(externalId, $"[PATCH] Error modificando cabecera de la Solicitud de Traslado {externalId}: {auroraMessage}");
         }
     }
 

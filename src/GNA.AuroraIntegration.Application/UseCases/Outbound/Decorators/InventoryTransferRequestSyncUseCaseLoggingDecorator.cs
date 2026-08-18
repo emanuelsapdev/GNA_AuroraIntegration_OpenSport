@@ -3,14 +3,14 @@ using Microsoft.Extensions.Logging;
 
 namespace GNA.AuroraIntegration.Application.UseCases.Outbound.Decorators;
 
-public sealed class TransferOutOrderSyncUseCaseLoggingDecorator : ITransferOutOrderSyncUseCase
+public sealed class InventoryTransferRequestSyncUseCaseLoggingDecorator : IInventoryTransferRequestSyncUseCase
 {
-    private readonly ITransferOutOrderSyncUseCase _inner;
-    private readonly ILogger<TransferOutOrderSyncUseCaseLoggingDecorator> _logger;
+    private readonly IInventoryTransferRequestSyncUseCase _inner;
+    private readonly ILogger<InventoryTransferRequestSyncUseCaseLoggingDecorator> _logger;
 
-    public TransferOutOrderSyncUseCaseLoggingDecorator(
-        ITransferOutOrderSyncUseCase inner,
-        ILogger<TransferOutOrderSyncUseCaseLoggingDecorator> logger)
+    public InventoryTransferRequestSyncUseCaseLoggingDecorator(
+        IInventoryTransferRequestSyncUseCase inner,
+        ILogger<InventoryTransferRequestSyncUseCaseLoggingDecorator> logger)
     {
         _inner = inner;
         _logger = logger;

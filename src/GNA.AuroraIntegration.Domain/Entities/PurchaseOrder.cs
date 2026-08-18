@@ -32,4 +32,6 @@ public sealed class PurchaseOrder
     public string? Notes { get; init; }
 
     public required IReadOnlyList<PurchaseOrderLine> Lines { get; init; }
+    /// <summary>Code de la fila en @GNA_AUR_REP_QUEUE que originó esta orden pendiente.</summary>
+    public string? QueueCode { get; init; }
 }

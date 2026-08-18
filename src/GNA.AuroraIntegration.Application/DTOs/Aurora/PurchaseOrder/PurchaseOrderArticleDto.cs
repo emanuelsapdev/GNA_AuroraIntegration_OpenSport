@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 
 /// <summary>
 /// Línea de artículo dentro del payload de creación de una Orden de Compra en Aurora.

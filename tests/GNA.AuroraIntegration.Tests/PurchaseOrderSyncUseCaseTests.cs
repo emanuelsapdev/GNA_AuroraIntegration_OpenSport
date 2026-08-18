@@ -1,4 +1,5 @@
 using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Application.UseCases.Outbound;
 using GNA.AuroraIntegration.Application.Validation;

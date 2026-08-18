@@ -1,4 +1,4 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 
 namespace GNA.AuroraIntegration.Application.Validation;
 

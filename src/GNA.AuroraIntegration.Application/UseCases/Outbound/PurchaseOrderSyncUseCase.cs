@@ -1,8 +1,9 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 using GNA.AuroraIntegration.Application.Validation;
 using GNA.AuroraIntegration.Domain.Entities;
+using GNA.AuroraIntegration.Domain.Enums;
 using GNA.AuroraIntegration.Domain.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -68,12 +69,13 @@ public sealed class PurchaseOrderSyncUseCase : IPurchaseOrderSyncUseCase
                 ct.ThrowIfCancellationRequested();
 
                 string docEntry = purchaseOrder.DocEntry.ToString();
-
+                string methodAction = string.Empty;
                 try
                 {
                     if (purchaseOrder.Cancelled)
                     {
                         await CancelInAuroraAsync(docEntry, ct);
+                        _logger.LogInformation("Orden de Compra '{DocEntry}' cancelada en Aurora.", docEntry);
                     }
                     else
                     {
@@ -89,6 +91,7 @@ public sealed class PurchaseOrderSyncUseCase : IPurchaseOrderSyncUseCase
                         else
                         {
                             await ReconcileLinesAsync(docEntry, purchaseOrder.Lines, ct);
+                            _logger.LogInformation("Líneas de Orden de Compra '{DocEntry}' conciliada en Aurora.", docEntry);
                         }
                     }
 
@@ -225,7 +228,7 @@ public sealed class PurchaseOrderSyncUseCase : IPurchaseOrderSyncUseCase
 
     private static PurchaseOrderArticleDto MapLine(PurchaseOrderLine line) => new()
     {
-        LineOrder = line.LineOrder,
+        LineOrder = line.LineOrder + 1,
         ArticleSku = line.ArticleSku,
         Quantity = ToAuroraQuantity(line.Quantity)
     };

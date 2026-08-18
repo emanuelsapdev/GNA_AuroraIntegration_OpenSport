@@ -46,11 +46,11 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
     }
 
     public async Task<IReadOnlyList<PurchaseOrder>> GetByDocEntryListAsync(
-        IEnumerable<string> docEntries, CancellationToken ct = default)
+        IEnumerable<(string, string)> docEntries, CancellationToken ct = default)
     {
         var parsedEntries = docEntries
             .Distinct()
-            .Select(key => (key, ok: TryParseDocEntry(key, out int value), value))
+            .Select(key => (key, ok: TryParseDocEntry(key.Item2, out int value), value))
             .ToList();
 
         foreach (var invalid in parsedEntries.Where(e => !e.ok))
@@ -58,10 +58,15 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
             _logger.LogWarning("DocEntry '{DocEntry}' no es un entero válido; se omite del lote.", invalid.key);
         }
 
-        var docEntryList = parsedEntries.Where(e => e.ok).Select(e => e.value).ToList();
-        if (docEntryList.Count == 0)
+        var validEntries = parsedEntries.Where(e => e.ok).ToList();
+        if (validEntries.Count == 0)
             return Array.Empty<PurchaseOrder>();
 
+        // Mapa de DocEntry (int) → queueCode para adjuntarlo a la entidad resultante.
+        var queueCodeByDocEntry = validEntries
+            .ToDictionary(e => e.value, e => e.key.Item1);
+
+        var docEntryList = validEntries.Select(e => e.value).ToList();
         var result = new List<PurchaseOrder>(docEntryList.Count);
 
         foreach (var batch in Chunk(docEntryList, FilterBatchSize))
@@ -85,13 +90,17 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
                 continue;
             }
 
-            result.AddRange(response?.Value.Select(MapToPurchaseOrder)!);
+            result.AddRange(response!.Value.Select(dto =>
+            {
+                queueCodeByDocEntry.TryGetValue(dto.DocEntry, out var queueCode);
+                return MapToPurchaseOrder(dto, queueCode);
+            }));
         }
 
         return result.AsReadOnly();
     }
 
-    private static PurchaseOrder MapToPurchaseOrder(ServiceLayerPurchaseOrderDto dto) => new()
+    private static PurchaseOrder MapToPurchaseOrder(ServiceLayerPurchaseOrderDto dto, string? queueCode = null) => new()
     {
         DocEntry = dto.DocEntry,
         DocNum = dto.DocNum,
@@ -102,7 +111,8 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
             LineOrder = line.LineNum,
             ArticleSku = line.ItemCode,
             Quantity = line.Quantity
-        })]
+        })],
+        QueueCode = queueCode
     };
 
     private static bool TryParseDocEntry(string docEntry, out int value)

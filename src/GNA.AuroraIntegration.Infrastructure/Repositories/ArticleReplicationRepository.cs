@@ -32,8 +32,8 @@ public sealed class ArticleReplicationRepository : IArticleReplicationRepository
     }
 
     public Task MarkArticleAsReplicatedAsync(string sku, CancellationToken ct = default)
-        => _store.MarkAsReplicatedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, SapB1ReplicationConstants.Queue.ExcludedStatuses.Article, ct);
+        => _store.MarkAsReplicatedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, ct);
 
     public Task MarkArticleAsFailedAsync(string sku, string errorMessage, CancellationToken ct = default)
-        => _store.MarkAsFailedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, errorMessage, SapB1ReplicationConstants.Queue.ExcludedStatuses.Article, ct);
+        => _store.MarkAsFailedAsync(ReplicableEntityType.Article, sku, SapB1ReplicationConstants.Queue.MaxRetryCounts.Article, errorMessage, ct);
 }

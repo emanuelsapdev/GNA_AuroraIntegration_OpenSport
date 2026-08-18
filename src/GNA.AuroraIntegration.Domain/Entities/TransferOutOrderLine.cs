@@ -4,7 +4,7 @@ namespace GNA.AuroraIntegration.Domain.Entities;
 /// Línea de una Solicitud de Traslado (WTQ1 en SAP B1). Representa un artículo solicitado
 /// con su cantidad, mapeado 1:1 al array "articles" del payload de creación en Aurora.
 /// </summary>
-public sealed class TransferOutOrderLine
+public sealed class InventoryTransferRequestLine
 {
     /// <summary>
     /// LineNum de WTQ1 en SAP B1. Se envía a Aurora como "lineOrder".

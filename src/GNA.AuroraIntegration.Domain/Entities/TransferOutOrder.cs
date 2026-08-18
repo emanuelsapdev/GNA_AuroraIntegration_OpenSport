@@ -5,7 +5,7 @@ namespace GNA.AuroraIntegration.Domain.Entities;
 /// replicada hacia Aurora WMS como "transfer out order" (envíos a Sucursales). Entidad pura,
 /// sin dependencias del SDK de SAP ni de infraestructura.
 /// </summary>
-public sealed class TransferOutOrder
+public sealed class InventoryTransferRequest
 {
     /// <summary>
     /// DocEntry de la Solicitud de Traslado en SAP B1. Es la clave natural utilizada como
@@ -19,7 +19,7 @@ public sealed class TransferOutOrder
 
     /// <summary>
     /// true si la Solicitud de Traslado fue cancelada en SAP B1 (campo estándar OWTQ.Cancelled,
-    /// expuesto por Service Layer como "tYES"/"tNO"). TransferOutOrderSyncUseCase usa este flag
+    /// expuesto por Service Layer como "tYES"/"tNO"). InventoryTransferRequestSyncUseCase usa este flag
     /// —no el Operation con el que quedó encolada la entrada— para decidir si corresponde
     /// cancelar la orden en Aurora en lugar de crearla/reconciliarla.
     /// </summary>
@@ -36,5 +36,7 @@ public sealed class TransferOutOrder
 
     public string? Notes { get; init; }
 
-    public required IReadOnlyList<TransferOutOrderLine> Lines { get; init; }
+    public required IReadOnlyList<InventoryTransferRequestLine> Lines { get; init; }
+    /// <summary>Code de la fila en @GNA_AUR_REP_QUEUE que originó esta orden pendiente.</summary>
+    public string? QueueCode { get; init; }
 }

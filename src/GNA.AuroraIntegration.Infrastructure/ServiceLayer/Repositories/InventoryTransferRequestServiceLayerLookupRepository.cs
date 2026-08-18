@@ -12,7 +12,7 @@ namespace GNA.AuroraIntegration.Infrastructure.ServiceLayer.Repositories;
 /// Implementa IInventoryTransferRequestLookupRepository consultando el recurso
 /// InventoryTransferRequests de SAP B1 Service Layer (incluye DocumentLines en la respuesta,
 /// sin necesidad de $expand: es una colección hija nativa del documento, igual que en
-/// Orders/PurchaseOrders). Fuente de verdad de negocio para TransferOutOrder antes de
+/// Orders/PurchaseOrders). Fuente de verdad de negocio para InventoryTransferRequest antes de
 /// replicar hacia Aurora.
 /// </summary>
 public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInventoryTransferRequestLookupRepository
@@ -31,7 +31,7 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
         _logger = logger;
     }
 
-    public async Task<TransferOutOrder?> GetByDocEntryAsync(string docEntry, CancellationToken ct = default)
+    public async Task<InventoryTransferRequest?> GetByDocEntryAsync(string docEntry, CancellationToken ct = default)
     {
         if (!TryParseDocEntry(docEntry, out int parsed))
         {
@@ -42,15 +42,15 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
         var doc = await _client.GetAsync<ServiceLayerInventoryTransferRequestDto>(
             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.Endpoint}({parsed})", ct);
 
-        return doc is null ? null : MapToTransferOutOrder(doc);
+        return doc is null ? null : MapToInventoryTransferRequest(doc);
     }
 
-    public async Task<IReadOnlyList<TransferOutOrder>> GetByDocEntryListAsync(
-        IEnumerable<string> docEntries, CancellationToken ct = default)
+    public async Task<IReadOnlyList<InventoryTransferRequest>> GetByDocEntryListAsync(
+        IEnumerable<(string, string)> docEntries, CancellationToken ct = default)
     {
         var parsedEntries = docEntries
             .Distinct()
-            .Select(key => (key, ok: TryParseDocEntry(key, out int value), value))
+            .Select(key => (key, ok: TryParseDocEntry(key.Item2, out int value), value))
             .ToList();
 
         foreach (var invalid in parsedEntries.Where(e => !e.ok))
@@ -58,11 +58,16 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
             _logger.LogWarning("DocEntry '{DocEntry}' no es un entero válido; se omite del lote.", invalid.key);
         }
 
-        var docEntryList = parsedEntries.Where(e => e.ok).Select(e => e.value).ToList();
-        if (docEntryList.Count == 0)
-            return Array.Empty<TransferOutOrder>();
+        var validEntries = parsedEntries.Where(e => e.ok).ToList();
+        if (validEntries.Count == 0)
+            return Array.Empty<InventoryTransferRequest>();
 
-        var result = new List<TransferOutOrder>(docEntryList.Count);
+        // Mapa de DocEntry (int) → queueCode para adjuntarlo a la entidad resultante.
+        var queueCodeByDocEntry = validEntries
+            .ToDictionary(e => e.value, e => e.key.Item1);
+
+        var docEntryList = validEntries.Select(e => e.value).ToList();
+        var result = new List<InventoryTransferRequest>(docEntryList.Count);
 
         foreach (var batch in Chunk(docEntryList, FilterBatchSize))
         {
@@ -71,7 +76,7 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
 
             string fields = $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocEntryField}," +
                             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocNumField}," +
-                            $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.CancelledField}," +
+                            $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocumentStatusField}," +
                             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocumentLinesField}";
 
             var resource = $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.Endpoint}?$filter={filter}" +
@@ -85,24 +90,29 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
                 continue;
             }
 
-            result.AddRange(response?.Value.Select(MapToTransferOutOrder)!);
+            result.AddRange(response!.Value.Select(dto =>
+            {
+                queueCodeByDocEntry.TryGetValue(dto.DocEntry, out var queueCode);
+                return MapToInventoryTransferRequest(dto, queueCode);
+            }));
         }
 
         return result.AsReadOnly();
     }
 
-    private static TransferOutOrder MapToTransferOutOrder(ServiceLayerInventoryTransferRequestDto dto) => new()
+    private static InventoryTransferRequest MapToInventoryTransferRequest(ServiceLayerInventoryTransferRequestDto dto, string? queueCode = null) => new()
     {
         DocEntry = dto.DocEntry,
         DocNum = dto.DocNum,
         Cancelled = string.Equals(
             dto.Cancelled, SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.CancelledYesValue, StringComparison.OrdinalIgnoreCase),
-        Lines = [.. dto.DocumentLines.Select(line => new TransferOutOrderLine
+        Lines = [.. dto.DocumentLines.Select(line => new InventoryTransferRequestLine
         {
             LineOrder = line.LineNum,
             ArticleSku = line.ItemCode,
             Quantity = line.Quantity
-        })]
+        })],
+        QueueCode = queueCode
     };
 
     private static bool TryParseDocEntry(string docEntry, out int value)
@@ -121,8 +131,8 @@ internal sealed class ServiceLayerInventoryTransferRequestDto
     public int DocEntry { get; set; }
     public int? DocNum { get; set; }
 
-    /// <summary>"tYES"/"tNO" (BoYesNoEnum). Ver SapB1InventoryTransferRequestsConstants.CancelledField.</summary>
-    public string? Cancelled { get; set; }
+    // TODO: ADAPTAR EL CANCELLED QUE NO EXISTE AL ESTADO DEL DOCUMENTO.
+    public string? DocumentStatus { get; set; }
 
     public List<ServiceLayerInventoryTransferRequestLineDto> DocumentLines { get; set; } = [];
 }

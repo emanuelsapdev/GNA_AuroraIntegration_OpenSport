@@ -1,4 +1,4 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -61,7 +61,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
     {
         RestRequest request = new(Endpoint, Method.Post);
 
-        AddWarehouseParameter(request, warehouse);
+        //AddWarehouseParameter(request, warehouse);
 
         var json = JsonSerializer.Serialize(purchaseOrder);
         request.AddJsonBody(json);
@@ -91,15 +91,16 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
                 "Aurora API error {StatusCode} creando Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, purchaseOrder.ExternalId, response.Content);
 
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
             throw new PurchaseOrderAuroraApiException(
-                purchaseOrder.ExternalId, $"Error creando Orden de Compra {purchaseOrder.ExternalId}: {response.StatusCode}");
+                purchaseOrder.ExternalId, $"[POST] Error creando Orden de Compra {purchaseOrder.ExternalId}: {auroraMessage}");
         }
     }
 
     public async Task<AuroraPurchaseOrderDto?> GetPurchaseOrderByExternalIdAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
-        RestRequest request = new($"{Endpoint}/{externalId}", Method.Get);
-        AddWarehouseParameter(request, warehouse);
+        RestRequest request = new($"{Endpoint}/PO-{externalId}", Method.Get);
+        //AddWarehouseParameter(request, warehouse);
 
         RestResponse response;
         try
@@ -107,7 +108,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
             {
                 RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
-                ThrowIfTransientFailure(transientResponse, Method.Get, $"{Endpoint}/{externalId}");
+                ThrowIfTransientFailure(transientResponse, Method.Get, $"{Endpoint}/PO-{externalId}");
                 return transientResponse;
             }, ct);
         }
@@ -129,7 +130,9 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} obteniendo Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error obteniendo Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[GET] Error obteniendo Orden de Compra {externalId}: {auroraMessage}");
         }
 
         return JsonSerializer.Deserialize<AuroraPurchaseOrderDto?>(response.Content ?? string.Empty);
@@ -138,7 +141,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
     public async Task<IReadOnlyList<PurchaseOrderArticleStateDto>> GetPurchaseOrderArticlesAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}/articles", Method.Get);
-        AddWarehouseParameter(request, warehouse);
+        //AddWarehouseParameter(request, warehouse);
 
         RestResponse response;
         try
@@ -168,7 +171,9 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} obteniendo líneas de la Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error obteniendo líneas de la Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[GET] Error obteniendo líneas de la Orden de Compra {externalId}: {auroraMessage}");
         }
 
         return JsonSerializer.Deserialize<List<PurchaseOrderArticleStateDto>>(response.Content ?? "[]") ?? [];
@@ -183,8 +188,8 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             return;
         }
 
-        RestRequest request = new($"{Endpoint}/{externalId}/articles", Method.Post);
-        AddWarehouseParameter(request, warehouse);
+        RestRequest request = new($"{Endpoint}/PO-{externalId}/articles", Method.Post);
+        //AddWarehouseParameter(request, warehouse);
         request.AddJsonBody(JsonSerializer.Serialize(articles));
 
         RestResponse response;
@@ -193,7 +198,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
             {
                 RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
-                ThrowIfTransientFailure(transientResponse, Method.Post, $"{Endpoint}/{externalId}/articles");
+                ThrowIfTransientFailure(transientResponse, Method.Post, $"{Endpoint}/PO-{externalId}/articles");
                 return transientResponse;
             }, ct);
         }
@@ -210,14 +215,17 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} agregando líneas a la Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error agregando líneas a la Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[POST] Error agregando líneas a la Orden de Compra {externalId}: {auroraMessage}");
         }
     }
 
     public async Task UpdatePurchaseOrderArticleAsync(string externalId, string articleSku, PurchaseOrderArticleDto article, string? warehouse, CancellationToken ct = default)
     {
-        RestRequest request = new($"{Endpoint}/{externalId}/articles/{articleSku}", Method.Patch);
-        AddWarehouseParameter(request, warehouse);
+        RestRequest request = new($"{Endpoint}/PO-{externalId}/articles/{articleSku}", Method.Patch);
+        //AddWarehouseParameter(request, warehouse);
+
         request.AddJsonBody(JsonSerializer.Serialize(article));
 
         RestResponse response;
@@ -226,7 +234,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
             {
                 RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
-                ThrowIfTransientFailure(transientResponse, Method.Patch, $"{Endpoint}/{externalId}/articles/{articleSku}");
+                ThrowIfTransientFailure(transientResponse, Method.Patch, $"{Endpoint}/PO-{externalId}/articles/{articleSku}");
                 return transientResponse;
             }, ct);
         }
@@ -243,14 +251,16 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} editando línea '{Sku}' de la Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, articleSku, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error editando línea '{articleSku}' de la Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[PATCH] Error editando línea '{articleSku}' de la Orden de Compra {externalId}: {auroraMessage}");
         }
     }
 
     public async Task RemovePurchaseOrderArticleAsync(string externalId, string articleSku, string? warehouse, CancellationToken ct = default)
     {
-        RestRequest request = new($"{Endpoint}/{externalId}/articles/{articleSku}", Method.Delete);
-        AddWarehouseParameter(request, warehouse);
+        RestRequest request = new($"{Endpoint}/PO-{externalId}/articles/{articleSku}", Method.Delete);
+        //AddWarehouseParameter(request, warehouse);
 
         RestResponse response;
         try
@@ -258,7 +268,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
             {
                 RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
-                ThrowIfTransientFailure(transientResponse, Method.Delete, $"{Endpoint}/{externalId}/articles/{articleSku}");
+                ThrowIfTransientFailure(transientResponse, Method.Delete, $"{Endpoint}/PO-{externalId}/articles/{articleSku}");
                 return transientResponse;
             }, ct);
         }
@@ -281,14 +291,16 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} eliminando línea '{Sku}' de la Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, articleSku, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error eliminando línea '{articleSku}' de la Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[DELETE] Error eliminando línea '{articleSku}' de la Orden de Compra {externalId}: {auroraMessage}");
         }
     }
 
     public async Task CancelPurchaseOrderAsync(string externalId, string? warehouse, CancellationToken ct = default)
     {
         RestRequest request = new($"{Endpoint}/{externalId}", Method.Delete);
-        AddWarehouseParameter(request, warehouse);
+        //AddWarehouseParameter(request, warehouse);
 
         RestResponse response;
         try
@@ -296,7 +308,7 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             response = await _resiliencePolicy.ExecuteAsync(async innerCt =>
             {
                 RestResponse transientResponse = await _client.ExecuteAsync(request, innerCt);
-                ThrowIfTransientFailure(transientResponse, Method.Delete, $"{Endpoint}/{externalId}");
+                ThrowIfTransientFailure(transientResponse, Method.Delete, $"{Endpoint}/PO-{externalId}");
                 return transientResponse;
             }, ct);
         }
@@ -320,7 +332,9 @@ public sealed class AuroraPurchaseOrderApiClient : IAuroraPurchaseOrderApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} cancelando Orden de Compra '{ExternalId}': {Body}",
                 response.StatusCode, externalId, response.Content);
-            throw new PurchaseOrderAuroraApiException(externalId, $"Error cancelando Orden de Compra {externalId}: {response.StatusCode}");
+
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new PurchaseOrderAuroraApiException(externalId, $"[DELETE] Error cancelando Orden de Compra {externalId}: {auroraMessage}");
         }
     }
 

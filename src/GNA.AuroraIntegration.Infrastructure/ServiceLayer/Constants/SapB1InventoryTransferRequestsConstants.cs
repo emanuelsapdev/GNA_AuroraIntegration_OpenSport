@@ -27,7 +27,7 @@ public static class SapB1InventoryTransferRequestsConstants
         /// fue cancelada mediante la acción oficial de Cancelar Documento en SAP B1. Verificar
         /// en Service Layer $metadata que el nombre/tipo coincide con la versión de B1 en uso.
         /// </summary>
-        public const string CancelledField = "Cancelled";
+        public const string DocumentStatusField = "DocumentStatus";
 
         /// <summary>Valor literal que Service Layer usa para BoYesNoEnum = tYES.</summary>
         public const string CancelledYesValue = "tYES";

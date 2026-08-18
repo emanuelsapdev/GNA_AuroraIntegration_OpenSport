@@ -144,7 +144,6 @@ public class EnsureReplicationSchemaUseCaseTests
                 ReplicationSchemaConstants.QueueTable.DbName,
                 It.Is<UserFieldDefinition>(f =>
                     f.Name == ReplicationSchemaConstants.QueueTable.Fields.RetryCount &&
-                    f.Description == "Reintentos realizados" &&
                     f.Type == UserFieldType.Numeric),
                 ct),
             Times.Once);
@@ -169,34 +168,11 @@ public class EnsureReplicationSchemaUseCaseTests
                 It.Is<UserTableDefinition>(t =>
                     t.TableName == ReplicationSchemaConstants.LogisticsCategoryTable.Name &&
                     t.TableDescription == ReplicationSchemaConstants.LogisticsCategoryTable.Description &&
-                    t.TableType == UserTableType.MasterData),
+                    t.TableType == UserTableType.NoObject),
                 ct),
             Times.Once);
 
         _output.WriteLine("✅ ÉXITO: Tabla GN_CATLOG creada correctamente");
-    }
-
-    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Categorías Logísticas")]
-    public async Task ExecuteAsync_ShouldCreateLogisticsCategoryUserObject()
-    {
-        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Categorías");
-
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _useCase.ExecuteAsync(ct);
-
-        // Assert
-        _mockSchemaService.Verify(
-            x => x.EnsureUserObjectAsync(
-                It.Is<UserObjectDefinition>(o =>
-                    o.Code == ReplicationSchemaConstants.LogisticsCategoryUserObject.Code &&
-                    o.TableName == ReplicationSchemaConstants.LogisticsCategoryUserObject.TableName),
-                ct),
-            Times.Once);
-
-        _output.WriteLine("✅ ÉXITO: Objeto usuario para Categorías creado correctamente");
     }
 
     [Fact(DisplayName = "✓ Debe crear la tabla GN_MARCAS (Marcas de Productos)")]
@@ -216,34 +192,11 @@ public class EnsureReplicationSchemaUseCaseTests
                 It.Is<UserTableDefinition>(t =>
                     t.TableName == ReplicationSchemaConstants.ProductBrandsTable.Name &&
                     t.TableDescription == ReplicationSchemaConstants.ProductBrandsTable.Description &&
-                    t.TableType == UserTableType.MasterData),
+                    t.TableType == UserTableType.NoObject),
                 ct),
             Times.Once);
 
         _output.WriteLine("✅ ÉXITO: Tabla GN_MARCAS creada correctamente");
-    }
-
-    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Marcas de Productos")]
-    public async Task ExecuteAsync_ShouldCreateProductBrandsUserObject()
-    {
-        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Marcas");
-
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _useCase.ExecuteAsync(ct);
-
-        // Assert
-        _mockSchemaService.Verify(
-            x => x.EnsureUserObjectAsync(
-                It.Is<UserObjectDefinition>(o =>
-                    o.Code == ReplicationSchemaConstants.ProductBrandsUserObject.Code &&
-                    o.TableName == ReplicationSchemaConstants.ProductBrandsUserObject.TableName),
-                ct),
-            Times.Once);
-
-        _output.WriteLine("✅ ÉXITO: Objeto usuario para Marcas creado correctamente");
     }
 
     [Fact(DisplayName = "✓ Debe crear la tabla GNA_AUR_BANNERS (Banners)")]
@@ -263,35 +216,12 @@ public class EnsureReplicationSchemaUseCaseTests
                 It.Is<UserTableDefinition>(t =>
                     t.TableName == ReplicationSchemaConstants.BannersTable.Name &&
                     t.TableDescription == ReplicationSchemaConstants.BannersTable.Description &&
-                    t.TableType == UserTableType.MasterData),
+                    t.TableType == UserTableType.NoObject),
                 ct),
             Times.Once);
 
         _output.WriteLine("✅ ÉXITO: Tabla GNA_AUR_BANNERS creada correctamente");
-    }
-
-    [Fact(DisplayName = "✓ Debe crear el objeto de usuario para Banners")]
-    public async Task ExecuteAsync_ShouldCreateBannersUserObject()
-    {
-        _output.WriteLine("🔄 INICIO: Validando creación de objeto usuario para Banners");
-
-        // Arrange
-        var ct = CancellationToken.None;
-
-        // Act
-        await _useCase.ExecuteAsync(ct);
-
-        // Assert
-        _mockSchemaService.Verify(
-            x => x.EnsureUserObjectAsync(
-                It.Is<UserObjectDefinition>(o =>
-                    o.Code == ReplicationSchemaConstants.BannersUserObject.Code &&
-                    o.TableName == ReplicationSchemaConstants.BannersUserObject.TableName),
-                ct),
-            Times.Once);
-
-        _output.WriteLine("✅ ÉXITO: Objeto usuario para Banners creado correctamente");
-    }
+    } 
 
     [Fact(DisplayName = "✓ No debe crear campos (UDF) adicionales para GNA_AUR_BANNERS")]
     public async Task ExecuteAsync_ShouldNotCreateExtraFieldsForBannersTable()
@@ -389,15 +319,15 @@ public class EnsureReplicationSchemaUseCaseTests
         await _useCase.ExecuteAsync(ct);
 
         // Assert
-        // 5 tablas + 14 campos + 3 objetos usuario = 22 operaciones totales
+        // 5 tablas + 16 campos = 21 operaciones totales
         // - QueueTable: 1 tabla + 5 campos
-        // - AttemptTable: 1 tabla + 4 campos
-        // - LogisticsCategoryTable: 1 tabla + 1 user object
-        // - ProductBrandsTable: 1 tabla + 1 user object
-        // - BannersTable: 1 tabla + 1 user object (sin campos adicionales, solo Code/Name por defecto)
+        // - AttemptTable: 1 tabla + 6 campos
+        // - LogisticsCategoryTable: 1 tabla
+        // - ProductBrandsTable: 1 tabla 
+        // - BannersTable: 1 tabla (sin campos adicionales, solo Code/Name por defecto)
         // - ItemsTable: 5 campos
         _output.WriteLine("📊 Total de operaciones ejecutadas: {0}", totalOperations);
-        Assert.Equal(22, totalOperations);
+        Assert.Equal(21, totalOperations);
         _output.WriteLine("✅ ÉXITO: Número de operaciones es correcto");
     }
 

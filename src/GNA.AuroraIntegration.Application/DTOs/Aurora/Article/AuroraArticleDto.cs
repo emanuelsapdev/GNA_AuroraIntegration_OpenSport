@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.Article;
 
 public sealed class AuroraArticleDto
 {

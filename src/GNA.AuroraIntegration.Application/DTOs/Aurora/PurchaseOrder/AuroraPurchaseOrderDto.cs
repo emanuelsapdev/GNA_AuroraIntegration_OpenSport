@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 
 /// <summary>
 /// Respuesta de GET /aurora-erp/purchase-orders/{externalId}. Se usa para el chequeo

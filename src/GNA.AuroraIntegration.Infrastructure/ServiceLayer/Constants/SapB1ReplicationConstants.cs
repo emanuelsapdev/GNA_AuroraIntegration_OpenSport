@@ -48,22 +48,15 @@ internal static class SapB1ReplicationConstants
         {
             public const int Article = 4;
             public const int PurchaseOrder = 4;
-            public const int TransferOutOrder = 4;
-        }
-
-        public static class ExcludedStatuses
-        {
-            public static readonly string[] Article = new[] { StatusValues.Replicated };
-            public static readonly string[] PurchaseOrder = new[] { StatusValues.Replicated };
-            public static readonly string[] TransferOutOrder = new[] { StatusValues.Replicated };
+            public const int InventoryTransferRequest = 4;
         }
 
         /// <summary>Valores posibles del campo U_Operation.</summary>
         public static class OperationValues
         {
-            public const string Insert = "I";
-            public const string Update = "U";
-            public const string Cancel = "C";
+            public const string Insert = "INSERT";
+            public const string Update = "UPDATE";
+            public const string Cancel = "CANCEL";
         }
     }
 
@@ -79,6 +72,8 @@ internal static class SapB1ReplicationConstants
         public const string EntityKey  = "U_GNA_AUR_EntityKey";
         public const string Message    = "U_GNA_AUR_Message";
         public const string CreatedAt  = "U_GNA_AUR_CreatedAt";
+        public const string CreatedTimeAt  = "U_GNA_AUR_CreatedTimeAt";
+        public const string CodeQueue  = "U_GNA_AUR_CodeQueue";
 
         public const int MessageMaxLength = 254;
     }

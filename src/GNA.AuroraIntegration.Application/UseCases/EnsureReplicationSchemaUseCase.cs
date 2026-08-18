@@ -1,6 +1,7 @@
 ﻿// Application/UseCases/EnsureReplicationSchemaUseCase.cs
 using GNA.AuroraIntegration.Domain.Constants;
 using GNA.AuroraIntegration.Domain.Entities.Schema;
+using GNA.AuroraIntegration.Domain.Enums;
 using GNA.AuroraIntegration.Domain.Enums.Schema;
 using GNA.AuroraIntegration.Domain.Interfaces;
 using static GNA.AuroraIntegration.Domain.Constants.ReplicationSchemaConstants;
@@ -47,13 +48,13 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
             new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.EntityKey, "Clave de la entidad", UserFieldType.Alpha, size: 50), ct);
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.QueueTable.DbName,
-            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.Operation, "Alta o modificación", UserFieldType.Alpha, size: 1), ct);
+            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.Operation, "Acción", UserFieldType.Alpha, size: 7), ct);
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.QueueTable.DbName,
-            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.Status, "Estado de replicación", UserFieldType.Alpha, size: 20), ct);
+            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.Status, "Estado", UserFieldType.Alpha, size: 20), ct);
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.QueueTable.DbName,
-            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.RetryCount, "Reintentos realizados", UserFieldType.Numeric), ct);
+            new UserFieldDefinition(ReplicationSchemaConstants.QueueTable.Fields.RetryCount, "Reintentos", UserFieldType.Numeric), ct);
     }
 
     private async Task EnsureAttemptTableAsync(CancellationToken ct)
@@ -75,6 +76,12 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
 
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.AttemptTable.DbName,
             new UserFieldDefinition(ReplicationSchemaConstants.AttemptTable.Fields.CreatedAt, "Fecha del intento", UserFieldType.Date), ct);
+
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.AttemptTable.DbName,
+            new UserFieldDefinition(ReplicationSchemaConstants.AttemptTable.Fields.CreatedTimeAt, "Hora del intento", UserFieldType.Date, UserFieldSubType.Time), ct);
+
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.AttemptTable.DbName,
+            new UserFieldDefinition(ReplicationSchemaConstants.AttemptTable.Fields.CodeQueue, "Código Queue", UserFieldType.Alpha, size: 50), ct);
     }
 
     private async Task EnsureLogisticsCategoryTableAsync(CancellationToken ct)
@@ -82,23 +89,8 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
             var logisticsCategoryTable = new UserTableDefinition(
             ReplicationSchemaConstants.LogisticsCategoryTable.Name,
             ReplicationSchemaConstants.LogisticsCategoryTable.Description,
-            UserTableType.MasterData);
+            UserTableType.NoObject);
         await _schema.EnsureUserTableAsync(logisticsCategoryTable, ct);
-
-        var logisticsCategoryUserObject = new UserObjectDefinition(
-            code: ReplicationSchemaConstants.LogisticsCategoryUserObject.Code,
-            name: ReplicationSchemaConstants.LogisticsCategoryUserObject.Name,
-            tableName: ReplicationSchemaConstants.LogisticsCategoryUserObject.TableName,
-            canClose: true,
-            canFind: true,
-            menuItem: true,
-            menuCaption: ReplicationSchemaConstants.LogisticsCategoryUserObject.MenuCaption,
-            fatherMenuID: ReplicationSchemaConstants.LogisticsCategoryUserObject.FatherMenuID,
-            position: ReplicationSchemaConstants.LogisticsCategoryUserObject.Position,
-            menuUID: ReplicationSchemaConstants.LogisticsCategoryUserObject.MenuUID,
-            canCreateDefaultForm: true,
-            objectType: UserObjectType.MasterData);
-        await _schema.EnsureUserObjectAsync(logisticsCategoryUserObject, ct);
     }
 
     private async Task EnsureProductBrandsTableAsync(CancellationToken ct)
@@ -106,24 +98,8 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
         var productBrandsTable = new UserTableDefinition(
             ReplicationSchemaConstants.ProductBrandsTable.Name,
             ReplicationSchemaConstants.ProductBrandsTable.Description,
-            UserTableType.MasterData);
+            UserTableType.NoObject);
         await _schema.EnsureUserTableAsync(productBrandsTable, ct);
-
-        var productBrandsUserObject = new UserObjectDefinition(
-            code: ReplicationSchemaConstants.ProductBrandsUserObject.Code,
-            name: ReplicationSchemaConstants.ProductBrandsUserObject.Name,
-            tableName: ReplicationSchemaConstants.ProductBrandsUserObject.TableName,
-            canClose: true,
-            canFind: true,
-            menuItem: true,
-            menuCaption: ReplicationSchemaConstants.ProductBrandsUserObject.MenuCaption,
-            fatherMenuID: ReplicationSchemaConstants.ProductBrandsUserObject.FatherMenuID,
-            position: ReplicationSchemaConstants.ProductBrandsUserObject.Position,
-            menuUID: ReplicationSchemaConstants.ProductBrandsUserObject.MenuUID,
-            canCreateDefaultForm: true,
-            objectType: UserObjectType.MasterData);
-        await _schema.EnsureUserObjectAsync(productBrandsUserObject, ct);
-
     }
 
     /// <summary>
@@ -135,23 +111,8 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
         var bannersTable = new UserTableDefinition(
             ReplicationSchemaConstants.BannersTable.Name,
             ReplicationSchemaConstants.BannersTable.Description,
-            UserTableType.MasterData);
+            UserTableType.NoObject);
         await _schema.EnsureUserTableAsync(bannersTable, ct);
-
-        var bannersUserObject = new UserObjectDefinition(
-            code: ReplicationSchemaConstants.BannersUserObject.Code,
-            name: ReplicationSchemaConstants.BannersUserObject.Name,
-            tableName: ReplicationSchemaConstants.BannersUserObject.TableName,
-            canClose: true,
-            canFind: true,
-            menuItem: true,
-            menuCaption: ReplicationSchemaConstants.BannersUserObject.MenuCaption,
-            fatherMenuID: ReplicationSchemaConstants.BannersUserObject.FatherMenuID,
-            position: ReplicationSchemaConstants.BannersUserObject.Position,
-            menuUID: ReplicationSchemaConstants.BannersUserObject.MenuUID,
-            canCreateDefaultForm: true,
-            objectType: UserObjectType.MasterData);
-        await _schema.EnsureUserObjectAsync(bannersUserObject, ct);
     }
 
     private async Task EnsureArticlesFieldsAsync(CancellationToken ct)

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 
 /// <summary>
 /// Body de POST /aurora-erp/transfer-out-orders.
@@ -15,7 +15,7 @@ namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
 /// Aurora los exige efectivamente para este recurso, el alta puede devolver 400. Pendiente
 /// de definición de negocio antes de producción.
 /// </summary>
-public sealed class CreateAuroraTransferOutOrderDto
+public sealed class CreateAuroraInventoryTransferRequestDto
 {
     [Required]
     [JsonPropertyName("externalId")]
@@ -46,7 +46,7 @@ public sealed class CreateAuroraTransferOutOrderDto
     [Required]
     [MinLength(1)]
     [JsonPropertyName("articles")]
-    public required TransferOutOrderArticleDto[] Articles { get; init; }
+    public required InventoryTransferRequestArticleDto[] Articles { get; init; }
 
     [JsonPropertyName("notes")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -21,5 +21,5 @@ public interface IArticleLookupRepository
     /// al procesar un batch de SKUs pendientes de replicación.
     /// </summary>
     Task<IReadOnlyList<Article>> GetBySkuListAsync(
-        IEnumerable<string> skus, CancellationToken ct = default);
+        IEnumerable<(string, string)> skus, CancellationToken ct = default);
 }

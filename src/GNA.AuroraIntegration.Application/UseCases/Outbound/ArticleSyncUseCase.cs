@@ -1,4 +1,4 @@
-﻿using GNA.AuroraIntegration.Application.DTOs.Aurora;
+﻿using GNA.AuroraIntegration.Application.DTOs.Aurora.Article;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Application.UseCases.Outbound.Interfaces;
 using GNA.AuroraIntegration.Application.Validation;
@@ -38,7 +38,7 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
 
         try
         {
-            IReadOnlyList<Article> pending = await _repository.GetPendingArticlesAsync(batchSize: 100, ct);
+           IReadOnlyList<Article> pending = await _repository.GetPendingArticlesAsync(batchSize: 100, ct);
 
             foreach (Article article in pending)
             {
@@ -101,7 +101,7 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Name = article.Name,
         Ean = article.PrimaryEan,
         Eans = MapEans(article.AdditionalEans),
-        BrandExternalId = article.BrandID,
+        //BrandExternalId = article.BrandID, // DA ERROR EN AURORA
         BrandName = article.BrandName,
         CategoryName = article.CategoryName,
         BannerExternalId = article.BannerID,
@@ -115,7 +115,7 @@ public sealed class ArticleSyncUseCase : IArticleSyncUseCase
         Sku = article.Sku,
         Name = article.Name,
         Eans = MapEans(article.AdditionalEans),
-        BrandExternalId = article.BrandID,
+        //BrandExternalId = article.BrandID, // DA ERROR EN AURORA
         BrandName = article.BrandName,
         CategoryName = article.CategoryName,
         BannerExternalId = article.BannerID,

@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.PurchaseOrder;
 using GNA.AuroraIntegration.Domain.Exceptions;
 
 namespace GNA.AuroraIntegration.Application.Validation;

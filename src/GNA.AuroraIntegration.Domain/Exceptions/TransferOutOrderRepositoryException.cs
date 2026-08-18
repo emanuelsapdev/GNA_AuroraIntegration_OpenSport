@@ -1,10 +1,10 @@
 namespace GNA.AuroraIntegration.Domain.Exceptions;
 
-public sealed class TransferOutOrderRepositoryException : AuroraIntegrationException
+public sealed class InventoryTransferRequestRepositoryException : AuroraIntegrationException
 {
-    public TransferOutOrderRepositoryException(string message)
+    public InventoryTransferRequestRepositoryException(string message)
         : base(message) { }
 
-    public TransferOutOrderRepositoryException(string message, Exception inner)
+    public InventoryTransferRequestRepositoryException(string message, Exception inner)
         : base(message, inner) { }
 }

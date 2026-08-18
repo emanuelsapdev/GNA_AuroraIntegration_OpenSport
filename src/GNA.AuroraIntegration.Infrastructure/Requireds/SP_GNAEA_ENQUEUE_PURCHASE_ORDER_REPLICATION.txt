@@ -1,0 +1,52 @@
+CREATE PROCEDURE SP_GNAEA_ENQUEUE_PURCHASE_ORDER_REPLICATION(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+	OUT error_code    INT,
+    OUT error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+    -- object_type '22' = Purchase Order. Cubre Alta, Modificación y Cancelación
+    -- (transaction_type 'A'/'U'/'C').
+	IF (:object_type = '22' AND :transaction_type IN ('A', 'U', 'C')) THEN -- OPOR
+
+		DECLARE v_exists  INT := 0;
+	    DECLARE v_code    NVARCHAR(50);
+		DECLARE v_doc_entry    NVARCHAR(255);
+		DECLARE v_operation    NVARCHAR(7);
+
+		v_doc_entry := :list_of_cols_val_tab_del;
+
+		IF (:transaction_type = 'A') THEN
+			v_operation := 'INSERT';
+		ELSEIF (:transaction_type = 'C') THEN
+			v_operation := 'CANCEL';
+		ELSE
+			v_operation := 'UPDATE';
+		END IF;
+
+	    SELECT COUNT(*) INTO v_exists
+	    FROM "@GNA_AUR_REP_QUEUE"
+	    WHERE "U_GNA_AUR_EntityType" = 'PURCHASE_ORDER'
+	      AND "U_GNA_AUR_EntityKey"  = :v_doc_entry
+	      AND ("U_GNA_AUR_Status"     = 'PENDING' OR ("U_GNA_AUR_Status" = 'FAILED' AND "U_GNA_AUR_RetryCount" < 4)); -- MAXIMO REINTENTOS
+
+	    IF :v_exists = 0 THEN
+	        v_code := 'OPOR-' || :v_doc_entry || '-' || TO_VARCHAR(CURRENT_TIMESTAMP, 'YYYYMMDDHH24MISS');
+
+	        INSERT INTO "@GNA_AUR_REP_QUEUE"
+	            ("Code", "Name", "U_GNA_AUR_EntityType", "U_GNA_AUR_EntityKey", "U_GNA_AUR_Operation", "U_GNA_AUR_Status", "U_GNA_AUR_RetryCount")
+	        VALUES
+	            (:v_code, :v_code, 'PURCHASE_ORDER', :v_doc_entry, :v_operation, 'PENDING', 0);
+	    END IF;
+
+    END IF;
+    
+    SELECT :error_code, :error_message FROM DUMMY;
+	RETURN;
+
+END;

@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 
 /// <summary>
 /// Respuesta de GET /aurora-erp/transfer-out-orders/{externalId}. Se usa para el chequeo
@@ -8,7 +8,7 @@ namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
 /// Refleja el contrato documentado completo (incluye campos de envío/logística que esta
 /// integración no consume hoy, pero que Aurora puede devolver).
 /// </summary>
-public sealed class AuroraTransferOutOrderDto
+public sealed class AuroraInventoryTransferRequestDto
 {
     [JsonPropertyName("externalId")]
     public string ExternalId { get; init; } = string.Empty;

@@ -57,18 +57,22 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
     }
 
     public async Task<IReadOnlyList<Article>> GetBySkuListAsync(
-        IEnumerable<string> skus, CancellationToken ct = default)
+        IEnumerable<(string, string)> skus, CancellationToken ct = default)
     {
         var skuList = skus.Distinct().ToList();
         if (skuList.Count == 0)
             return Array.Empty<Article>();
+
+        // Mapa de SKU → queueCode para adjuntarlo al artículo resultante.
+        var queueCodeBySku = skuList
+            .ToDictionary(t => t.Item2, t => t.Item1, StringComparer.OrdinalIgnoreCase);
 
         var items = new List<ServiceLayerItemDto>(skuList.Count);
 
         foreach (var batch in Chunk(skuList, FilterBatchSize))
         {
             var filter = string.Join(" or ",
-                batch.Select(sku => $"ItemCode eq '{EscapeODataValue(sku)}'"));
+                batch.Select(sku => $"ItemCode eq '{EscapeODataValue(sku.Item2)}'"));
 
             string fields = $"{SapB1ItemsConstants.Items.ItemCodeField}," +
                             $"{SapB1ItemsConstants.Items.ItemNameField}," +
@@ -110,7 +114,11 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
             SapB1BannersConstants.Banners.NameField,
             DistinctCodes(items, i => i.BannerID), "Banners (GNA_AUR_BANNERS)", ct);
 
-        return items.Select(item => MapToArticle(item, brandNamesByCode, bannerNamesByCode)).ToList().AsReadOnly();
+        return items.Select(item =>
+        {
+            queueCodeBySku.TryGetValue(item.ItemCode, out var queueCode);
+            return MapToArticle(item, brandNamesByCode, bannerNamesByCode, queueCode);
+        }).ToList().AsReadOnly();
     }
 
     /// <summary>
@@ -132,7 +140,7 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
         foreach (var batch in Chunk(codes.ToList(), FilterBatchSize))
         {
             var filter = string.Join(" or ",
-                batch.Select(code => $"{codeField} eq '{EscapeODataValue(code)}'"));
+                batch.Select(code => $"{codeField} eq '{EscapeODataValue(code)}'")); 
 
             string fields = $"{codeField},{nameField}";
 
@@ -170,7 +178,8 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
     private static Article MapToArticle(
         ServiceLayerItemDto dto,
         IReadOnlyDictionary<string, string> brandNamesByCode,
-        IReadOnlyDictionary<string, string> bannerNamesByCode)
+        IReadOnlyDictionary<string, string> bannerNamesByCode,
+        string? queueCode = null)
         => new Article {
             Sku = dto.ItemCode,
             Name = dto.ItemName,
@@ -181,7 +190,8 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
             BrandName = ResolveName(dto.BrandID, brandNamesByCode),
             CategoryName = dto.CategoryName,
             IsBulky = dto.IsBulky == "Y",
-            IsCaged = dto.IsCaged == "Y"
+            IsCaged = dto.IsCaged == "Y",
+            QueueCode = queueCode
         };
 
     private static string? ResolveName(string? code, IReadOnlyDictionary<string, string> namesByCode)
@@ -189,6 +199,11 @@ public sealed class ArticleServiceLayerLookupRepository : IArticleLookupReposito
 
     private static string EscapeODataValue(string value) => value.Replace("'", "''");
 
+    private static IEnumerable<List<(string, string)>> Chunk(List<(string, string)> source, int size)
+    {
+        for (int i = 0; i < source.Count; i += size)
+            yield return source.GetRange(i, Math.Min(size, source.Count - i));
+    }
     private static IEnumerable<List<string>> Chunk(List<string> source, int size)
     {
         for (int i = 0; i < source.Count; i += size)

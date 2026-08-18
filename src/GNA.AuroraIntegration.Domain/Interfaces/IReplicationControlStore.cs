@@ -10,16 +10,16 @@ namespace GNA.AuroraIntegration.Domain.Interfaces;
 /// </summary>
 public interface IReplicationControlStore
 {
-    Task<IReadOnlyList<string>> GetPendingKeysAsync(
+    Task<IReadOnlyList<(string, string)>> GetPendingKeysAsync(
         ReplicableEntityType entityType, int batchSize, CancellationToken ct = default);
 
     Task EnqueueAsync(
         ReplicableEntityType entityType, string entityKey,
-        ReplicationOperationType operationType, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
+        ReplicationOperationType operationType, int maxRetryCount, CancellationToken ct = default);
 
     Task MarkAsReplicatedAsync(
-        ReplicableEntityType entityType, string entityKey, int maxRetryCount, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, CancellationToken ct = default);
 
     Task MarkAsFailedAsync(
-        ReplicableEntityType entityType, string entityKey, int maxRetryCount, string errorMessage, IEnumerable<string> excludedStatuses, CancellationToken ct = default);
+        ReplicableEntityType entityType, string entityKey, int maxRetryCount, string errorMessage, CancellationToken ct = default);
 }

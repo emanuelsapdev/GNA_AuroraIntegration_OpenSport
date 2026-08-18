@@ -21,5 +21,5 @@ public interface IPurchaseOrderLookupRepository
     /// al procesar un batch de DocEntry pendientes de replicación.
     /// </summary>
     Task<IReadOnlyList<PurchaseOrder>> GetByDocEntryListAsync(
-        IEnumerable<string> docEntries, CancellationToken ct = default);
+        IEnumerable<(string, string)> docEntries, CancellationToken ct = default);
 }

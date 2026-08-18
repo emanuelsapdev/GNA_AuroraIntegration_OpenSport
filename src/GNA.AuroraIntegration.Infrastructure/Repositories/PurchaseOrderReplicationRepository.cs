@@ -33,12 +33,12 @@ public sealed class PurchaseOrderReplicationRepository : IPurchaseOrderReplicati
     public Task MarkPurchaseOrderAsReplicatedAsync(string docEntry, CancellationToken ct = default)
         => _store.MarkAsReplicatedAsync(
             ReplicableEntityType.PurchaseOrder, docEntry,
-            SapB1ReplicationConstants.Queue.MaxRetryCounts.PurchaseOrder,
-            SapB1ReplicationConstants.Queue.ExcludedStatuses.PurchaseOrder, ct);
+            SapB1ReplicationConstants.Queue.MaxRetryCounts.PurchaseOrder
+            , ct);
 
     public Task MarkPurchaseOrderAsFailedAsync(string docEntry, string errorMessage, CancellationToken ct = default)
         => _store.MarkAsFailedAsync(
             ReplicableEntityType.PurchaseOrder, docEntry,
-            SapB1ReplicationConstants.Queue.MaxRetryCounts.PurchaseOrder, errorMessage,
-            SapB1ReplicationConstants.Queue.ExcludedStatuses.PurchaseOrder, ct);
+            SapB1ReplicationConstants.Queue.MaxRetryCounts.PurchaseOrder, errorMessage
+            , ct);
 }

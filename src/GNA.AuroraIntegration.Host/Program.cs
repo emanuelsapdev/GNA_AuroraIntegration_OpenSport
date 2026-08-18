@@ -48,13 +48,13 @@ builder.Services.AddScoped<IArticleReplicationRepository, ArticleReplicationRepo
 builder.Services.AddScoped<IPurchaseOrderLookupRepository, PurchaseOrderServiceLayerLookupRepository>();
 builder.Services.AddScoped<IPurchaseOrderReplicationRepository, PurchaseOrderReplicationRepository>();
 builder.Services.AddScoped<IInventoryTransferRequestLookupRepository, InventoryTransferRequestServiceLayerLookupRepository>();
-builder.Services.AddScoped<ITransferOutOrderReplicationRepository, TransferOutOrderReplicationRepository>();
+builder.Services.AddScoped<IInventoryTransferRequestReplicationRepository, InventoryTransferRequestReplicationRepository>();
 
 // Singleton: AuroraPurchaseOrderApiClient gestiona internamente su RestClient (misma convención que AuroraArticleApiClient)
 builder.Services.AddSingleton<IAuroraPurchaseOrderApiClient, AuroraPurchaseOrderApiClient>();
 
-// Singleton: AuroraTransferOutOrderApiClient gestiona internamente su RestClient (misma convención que AuroraPurchaseOrderApiClient)
-builder.Services.AddSingleton<IAuroraTransferOutOrderApiClient, AuroraTransferOutOrderApiClient>();
+// Singleton: AuroraInventoryTransferRequestApiClient gestiona internamente su RestClient (misma convención que AuroraPurchaseOrderApiClient)
+builder.Services.AddSingleton<IAuroraInventoryTransferRequestApiClient, AuroraInventoryTransferRequestApiClient>();
 
 // Agregar repositorios y casos de uso
 builder.Services.AddScoped<IEnsureReplicationSchemaUseCase, EnsureReplicationSchemaUseCase>();
@@ -66,12 +66,12 @@ builder.Services.AddScoped<IPurchaseOrderPayloadValidator, PurchaseOrderPayloadV
 builder.Services.AddScoped<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCase>();
 builder.Services.Decorate<IPurchaseOrderSyncUseCase, PurchaseOrderSyncUseCaseLoggingDecorator>();
 
-builder.Services.AddScoped<ITransferOutOrderPayloadValidator, TransferOutOrderPayloadValidator>();
-builder.Services.AddScoped<ITransferOutOrderSyncUseCase, TransferOutOrderSyncUseCase>();
-builder.Services.Decorate<ITransferOutOrderSyncUseCase, TransferOutOrderSyncUseCaseLoggingDecorator>();
+builder.Services.AddScoped<IInventoryTransferRequestPayloadValidator, InventoryTransferRequestPayloadValidator>();
+builder.Services.AddScoped<IInventoryTransferRequestSyncUseCase, InventoryTransferRequestSyncUseCase>();
+builder.Services.Decorate<IInventoryTransferRequestSyncUseCase, InventoryTransferRequestSyncUseCaseLoggingDecorator>();
 
 // ---- Bootstrap de esquema: SIEMPRE antes de Quartz ----
-builder.Services.AddHostedService<SchemaBootstrapperHostedService>(); // DESCOMENTAR 
+builder.Services.AddHostedService<SchemaBootstrapperHostedService>();  
 
 // Configurar Quartz para ejecutar los jobs de sincronización
 builder.Services.AddQuartz(q =>
@@ -88,11 +88,11 @@ builder.Services.AddQuartz(q =>
         .WithIdentity("PurchaseOrdersSyncJob-trigger")
         .WithCronSchedule(builder.Configuration["Jobs:PurchaseOrdersSyncJob:Cron"]!));
 
-    var transferOutOrdersJobKey = new JobKey("TransferOutOrdersSyncJob");
-    q.AddJob<TransferOutOrdersSyncJob>(opts => opts.WithIdentity(transferOutOrdersJobKey));
-    q.AddTrigger(t => t.ForJob(transferOutOrdersJobKey)
-        .WithIdentity("TransferOutOrdersSyncJob-trigger")
-        .WithCronSchedule(builder.Configuration["Jobs:TransferOutOrdersSyncJob:Cron"]!));
+    var inventoryTransferRequestJobKey = new JobKey("InventoryTransferRequestSyncJob");
+    q.AddJob<InventoryTransferRequestSyncJob>(opts => opts.WithIdentity(inventoryTransferRequestJobKey));
+    q.AddTrigger(t => t.ForJob(inventoryTransferRequestJobKey)
+        .WithIdentity("InventoryTransferRequestSyncJob-trigger")
+        .WithCronSchedule(builder.Configuration["Jobs:InventoryTransferRequestSyncJob:Cron"]!));
 });
 builder.Services.AddQuartzHostedService(q => q.WaitForJobsToComplete = true);
 

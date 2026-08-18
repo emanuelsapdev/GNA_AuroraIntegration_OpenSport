@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.InventoryTransferRequest;
 
 /// <summary>
 /// Línea de artículo dentro del payload de creación/edición de una orden de transferencia
@@ -9,7 +9,7 @@ namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
 /// "article" (alta de artículo nuevo embebido) que la API de Aurora admite como opcional —
 /// mismo criterio ya aplicado en PurchaseOrderArticleDto.
 /// </summary>
-public sealed class TransferOutOrderArticleDto
+public sealed class InventoryTransferRequestArticleDto
 {
     [JsonPropertyName("lineOrder")]
     public required int LineOrder { get; init; }

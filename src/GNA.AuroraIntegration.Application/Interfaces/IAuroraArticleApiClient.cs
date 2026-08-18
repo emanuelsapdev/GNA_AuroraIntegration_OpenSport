@@ -1,4 +1,4 @@
-using GNA.AuroraIntegration.Application.DTOs.Aurora;
+using GNA.AuroraIntegration.Application.DTOs.Aurora.Article;
 
 namespace GNA.AuroraIntegration.Application.Interfaces;
 

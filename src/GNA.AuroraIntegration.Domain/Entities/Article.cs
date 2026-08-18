@@ -24,6 +24,8 @@ public sealed class Article
     public string? BannerName { get; init; }
     public bool IsBulky { get; init; }
     public bool IsCaged { get; init; }
+    /// <summary>Code de la fila en @GNA_AUR_REP_QUEUE que originó este artículo pendiente.</summary>
+    public string? QueueCode { get; init; }
 
 
     // No utilizados

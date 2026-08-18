@@ -1,4 +1,4 @@
-﻿using GNA.AuroraIntegration.Application.DTOs.Aurora;
+﻿using GNA.AuroraIntegration.Application.DTOs.Aurora.Article;
 using GNA.AuroraIntegration.Application.Interfaces;
 using GNA.AuroraIntegration.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
@@ -76,7 +76,8 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
                 "Aurora API error {StatusCode} creando artículo '{Sku}': {Body}",
                 response.StatusCode, article.Sku, response.Content);
 
-            throw new ArticleAuroraApiException(article.Sku, $"Error creando artículo {article.Sku}: {response.StatusCode}");
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new ArticleAuroraApiException(article.Sku, $"[POST] Error creando artículo en Aurora - {auroraMessage}");
         }
     }
 
@@ -115,7 +116,8 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
                 "Aurora API error {StatusCode} actualizando artículo '{Sku}': {Body}",
                 response.StatusCode, sku, response.Content);
 
-            throw new ArticleAuroraApiException(sku, $"Error actualizando artículo {sku}: {response.StatusCode}");
+            string auroraMessage = AuroraApiErrorMessageExtractor.GetErrorMessageOrStatusCode(response.Content, response.StatusCode);
+            throw new ArticleAuroraApiException(sku, $"[PATCH]: Error actualizando artículo en Aurora - {auroraMessage}");
         }
     }
 
@@ -151,7 +153,7 @@ public sealed class AuroraArticleApiClient : IAuroraArticleApiClient
             _logger.LogError(
                 "Aurora API error {StatusCode} obteniendo artículo '{Sku}': {Body}",
                 response.StatusCode, sku, response.Content);
-            throw new ArticleAuroraApiException(sku, $"Error obteniendo artículo {sku}: {response.StatusCode}");
+            throw new ArticleAuroraApiException(sku, $"[GET]: Error obteniendo artículo en Aurora - {response.StatusCode}");
         }
 
         return JsonSerializer.Deserialize<AuroraArticleDto?>(response.Content ?? string.Empty);

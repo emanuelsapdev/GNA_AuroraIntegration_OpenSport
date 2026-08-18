@@ -3,12 +3,12 @@ using GNA.AuroraIntegration.Domain.Entities;
 namespace GNA.AuroraIntegration.Domain.Interfaces;
 
 /// <summary>
-/// Contrato específico de replicación para TransferOutOrder (ISP: el consumidor de Application
-/// solo ve operaciones de TransferOutOrder, sin saber que por debajo hay una tabla compartida).
+/// Contrato específico de replicación para InventoryTransferRequest (ISP: el consumidor de Application
+/// solo ve operaciones de InventoryTransferRequest, sin saber que por debajo hay una tabla compartida).
 /// </summary>
-public interface ITransferOutOrderReplicationRepository
+public interface IInventoryTransferRequestReplicationRepository
 {
-    Task<IReadOnlyList<TransferOutOrder>> GetPendingTransferOutOrdersAsync(int batchSize = 100, CancellationToken ct = default);
-    Task MarkTransferOutOrderAsReplicatedAsync(string docEntry, CancellationToken ct = default);
-    Task MarkTransferOutOrderAsFailedAsync(string docEntry, string errorMessage, CancellationToken ct = default);
+    Task<IReadOnlyList<InventoryTransferRequest>> GetPendingInventoryTransferRequestAsync(int batchSize = 100, CancellationToken ct = default);
+    Task MarkInventoryTransferRequestAsReplicatedAsync(string docEntry, CancellationToken ct = default);
+    Task MarkInventoryTransferRequestAsFailedAsync(string docEntry, string errorMessage, CancellationToken ct = default);
 }

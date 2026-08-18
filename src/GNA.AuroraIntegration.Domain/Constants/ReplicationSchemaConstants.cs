@@ -52,6 +52,8 @@ public static class ReplicationSchemaConstants
             public const string EntityKey  = "GNA_AUR_EntityKey";
             public const string Message    = "GNA_AUR_Message";
             public const string CreatedAt  = "GNA_AUR_CreatedAt";
+            public const string CreatedTimeAt  = "GNA_AUR_CreatedTimeAt";
+            public const string CodeQueue = "GNA_AUR_CodeQueue";
         }
     }
 

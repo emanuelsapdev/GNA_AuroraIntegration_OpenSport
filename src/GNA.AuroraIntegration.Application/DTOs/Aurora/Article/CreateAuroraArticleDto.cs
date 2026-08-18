@@ -1,14 +1,21 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace GNA.AuroraIntegration.Application.DTOs.Aurora;
+namespace GNA.AuroraIntegration.Application.DTOs.Aurora.Article;
 
-public sealed class UpdateAuroraArticleDto
+public sealed class CreateAuroraArticleDto
 {
     [Required]
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+
+    [Required]
     [JsonPropertyName("sku")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Sku { get; init; }
+    public required string Sku { get; init; }
+
+    [Required]
+    [JsonPropertyName("ean")]
+    public required string Ean { get; init; }
 
     [JsonPropertyName("eans")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -17,10 +24,6 @@ public sealed class UpdateAuroraArticleDto
     [JsonPropertyName("tagsIds")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int[]? TagsIds { get; init; }
-
-    [JsonPropertyName("name")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Name { get; init; }
 
     [JsonPropertyName("description")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
