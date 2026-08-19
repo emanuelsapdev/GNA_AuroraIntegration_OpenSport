@@ -9,31 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace GNA.AuroraIntegration.Application.UseCases.Outbound;
 
-/// <summary>
-/// Caso de uso: toma Órdenes de Compra pendientes de SAP B1 (Alta, Modificación o
-/// Cancelación) y las refleja en Aurora WMS.
-///
-/// - Si la OC está cancelada en SAP (PurchaseOrder.Cancelled, ver
-///   PurchaseOrderServiceLayerLookupRepository): se cancela en Aurora (DELETE), o no se hace
-///   nada si nunca llegó a existir allí. Esta rama tiene prioridad sobre Alta/Modificación:
-///   una OC cancelada nunca se crea ni se reconcilia, sin importar con qué Operation haya
-///   quedado encolada la entrada.
-/// - Si no está cancelada y no existe todavía en Aurora (chequeo vía GET): se crea completa.
-/// - Si no está cancelada y ya existe: Aurora no expone un PATCH de header para
-///   "purchase-orders" (a diferencia de "sale-orders"), así que la única forma de reflejar
-///   una modificación es a nivel línea. Se reconcilia el estado actual de SAP contra el de
-///   Aurora (GET .../articles):
-///     • líneas nuevas en SAP  → se agregan (POST .../articles)
-///     • líneas con cantidad distinta → se editan (PATCH .../articles/{sku})
-///     • líneas que ya no están en SAP → se eliminan (DELETE .../articles/{sku})
-///   Las líneas con fulfilledQuantity > 0 en Aurora (ya recibidas/en proceso en el depósito)
-///   NUNCA se editan ni se eliminan — se loguea una advertencia y se continúa, para no
-///   interferir con mercadería que el depósito ya procesó.
-///
-/// Fuera de alcance todavía (backlog): sincronización de campos de header
-/// (bannerName/bannerExternalId/notes) — Aurora no expone endpoint para esto en
-/// purchase-orders.
-/// </summary>
 public sealed class PurchaseOrderSyncUseCase : IPurchaseOrderSyncUseCase
 {
     private readonly IPurchaseOrderReplicationRepository _repository;
@@ -69,10 +44,10 @@ public sealed class PurchaseOrderSyncUseCase : IPurchaseOrderSyncUseCase
                 ct.ThrowIfCancellationRequested();
 
                 string docEntry = purchaseOrder.DocEntry.ToString();
-                string methodAction = string.Empty;
+               
                 try
                 {
-                    if (purchaseOrder.Cancelled)
+                    if (purchaseOrder.IsClosedManual || purchaseOrder.Cancelled) 
                     {
                         await CancelInAuroraAsync(docEntry, ct);
                         _logger.LogInformation("Orden de Compra '{DocEntry}' cancelada en Aurora.", docEntry);

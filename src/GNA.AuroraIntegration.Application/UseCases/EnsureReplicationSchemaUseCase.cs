@@ -31,6 +31,7 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
         await EnsureProductBrandsTableAsync(ct);
         await EnsureBannersTableAsync(ct);
         await EnsureArticlesFieldsAsync(ct);
+        await EnsureDocMarketingFieldsAsync(ct);
     }
 
     private async Task EnsureQueueTableAsync(CancellationToken ct)
@@ -140,5 +141,15 @@ public sealed class EnsureReplicationSchemaUseCase : IEnsureReplicationSchemaUse
         await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.ItemsTable.DbName,
            new UserFieldDefinition(ReplicationSchemaConstants.ItemsTable.Fields.Banner, "Banner", UserFieldType.Alpha, size: 30, linkedTable: ReplicationSchemaConstants.BannersTable.Name), ct);
 
+    }
+
+    private async Task EnsureDocMarketingFieldsAsync(CancellationToken ct)
+    {
+        await _schema.EnsureUserFieldAsync(ReplicationSchemaConstants.DocMarketingTables.DbName,
+            new UserFieldDefinition(ReplicationSchemaConstants.DocMarketingTables.Fields.TypeClosure, "Tipo de Cierre", UserFieldType.Alpha, size: 10, validValues: new List<UserFieldDefinition.ValidValueDefinition>
+            {
+                new UserFieldDefinition.ValidValueDefinition("MANUAL", "MANUAL"),
+                new UserFieldDefinition.ValidValueDefinition("AUTO", "AUTOMATICO")
+            }, defaultValue: "AUTO"), ct);
     }
 }

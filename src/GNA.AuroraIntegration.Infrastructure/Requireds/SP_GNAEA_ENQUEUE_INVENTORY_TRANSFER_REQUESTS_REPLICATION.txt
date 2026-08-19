@@ -11,8 +11,8 @@ LANGUAGE SQLSCRIPT
 AS
 BEGIN
 
-    -- Cubre Alta, Modificación y Cancelación (transaction_type 'A'/'U'/'C').
-	IF (:object_type = '1250000001' AND :transaction_type IN ('A', 'U', 'C')) THEN -- OWTQ
+    -- Cubre Alta, Modificación, Cancelación y Cierre (transaction_type 'A'/'U'/'C'/'L').
+	IF (:object_type = '1250000001' AND :transaction_type IN ('A', 'U', 'C', 'L')) THEN -- OWTQ
 
 		DECLARE v_exists  INT := 0;
 	    DECLARE v_code    NVARCHAR(50);
@@ -25,6 +25,8 @@ BEGIN
 			v_operation := 'INSERT';
 		ELSEIF (:transaction_type = 'C') THEN
 			v_operation := 'CANCEL';
+		ELSEIF (:transaction_type = 'L') THEN
+			v_operation := 'CLOSE';
 		ELSE
 			v_operation := 'UPDATE';
 		END IF;

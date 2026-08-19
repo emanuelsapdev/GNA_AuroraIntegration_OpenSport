@@ -1,4 +1,4 @@
-CREATE PROCEDURE SP_GNAEA_ENQUEUE_PURCHASE_ORDER_REPLICATION(
+ALTER PROCEDURE SP_GNAEA_ENQUEUE_PURCHASE_ORDER_REPLICATION(
     in object_type nvarchar(30), 				-- SBO Object Type
 	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
 	in num_of_cols_in_key int,
@@ -10,9 +10,9 @@ CREATE PROCEDURE SP_GNAEA_ENQUEUE_PURCHASE_ORDER_REPLICATION(
 LANGUAGE SQLSCRIPT
 AS
 BEGIN
-    -- object_type '22' = Purchase Order. Cubre Alta, Modificación y Cancelación
-    -- (transaction_type 'A'/'U'/'C').
-	IF (:object_type = '22' AND :transaction_type IN ('A', 'U', 'C')) THEN -- OPOR
+    -- object_type '22' = Purchase Order. Cubre Alta, Modificación, Cancelación y Cierre
+    -- (transaction_type 'A'/'U'/'C'/'L').
+	IF (:object_type = '22' AND :transaction_type IN ('A', 'U', 'C', 'L')) THEN -- OPOR
 
 		DECLARE v_exists  INT := 0;
 	    DECLARE v_code    NVARCHAR(50);
@@ -25,6 +25,8 @@ BEGIN
 			v_operation := 'INSERT';
 		ELSEIF (:transaction_type = 'C') THEN
 			v_operation := 'CANCEL';
+		ELSEIF (:transaction_type = 'L') THEN
+			v_operation := 'CLOSE';
 		ELSE
 			v_operation := 'UPDATE';
 		END IF;

@@ -17,13 +17,7 @@ public sealed class InventoryTransferRequest
     /// <summary>Número de documento visible al usuario en SAP B1 (informativo, no se usa como clave).</summary>
     public int? DocNum { get; init; }
 
-    /// <summary>
-    /// true si la Solicitud de Traslado fue cancelada en SAP B1 (campo estándar OWTQ.Cancelled,
-    /// expuesto por Service Layer como "tYES"/"tNO"). InventoryTransferRequestSyncUseCase usa este flag
-    /// —no el Operation con el que quedó encolada la entrada— para decidir si corresponde
-    /// cancelar la orden en Aurora en lugar de crearla/reconciliarla.
-    /// </summary>
-    public bool Cancelled { get; init; }
+    public bool IsClosedManual { get; init; }
 
     // TODO (Etapa 1 - pendiente de definición de negocio): la documentación de Aurora no marca
     // bannerExternalId/logisticOperatorExternalId/postalCode/shippingPriorityExternalId como

@@ -170,7 +170,7 @@ public sealed class ArticleSyncUseCaseTests
             It.Is<CreateAuroraArticleDto>(dto =>
                 dto.BannerExternalId == article.BannerID &&
                 dto.BannerName == article.BannerName &&
-                //dto.BrandExternalId == article.BrandID &&
+                dto.BrandExternalId == article.BrandID &&
                 dto.BrandName == article.BrandName),
             null,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -198,7 +198,7 @@ public sealed class ArticleSyncUseCaseTests
             It.Is<UpdateAuroraArticleDto>(dto =>
                 dto.BannerExternalId == article.BannerID &&
                 dto.BannerName == article.BannerName &&
-                //dto.BrandExternalId == article.BrandID &&  // TODO: Ajustar cuando AURORA arregle el BUG que tienen con la Marca
+                dto.BrandExternalId == article.BrandID && 
                 dto.BrandName == article.BrandName),
             null,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -211,7 +211,7 @@ public sealed class ArticleSyncUseCaseTests
         PrimaryEan = "1234567890123",
         AdditionalEans = [],
         CategoryName = "Categoría de prueba",
-        //BrandID = "MAR001", // TODO: Ajustar cuando AURORA arregle el BUG que tienen con la Marca
+        BrandID = "MAR001", 
         BrandName = "Marca de Prueba",
         BannerID = "BAN001",
         BannerName = "Banner de Prueba",

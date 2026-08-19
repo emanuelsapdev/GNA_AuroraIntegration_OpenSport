@@ -131,4 +131,17 @@ public static class ReplicationSchemaConstants
             public const string Banner = "GNA_AUR_Banner" + sufix;
         }
     }
+
+    public static class DocMarketingTables
+    {
+        public const string Name = "OPOR";
+
+        public const string DbName = "OPOR";
+
+        public static class Fields
+        {
+            public const string TypeClosure = "GNA_AUR_TypeClosure" + sufix;
+
+        }
+    }
 }

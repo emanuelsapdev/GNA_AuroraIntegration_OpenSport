@@ -319,15 +319,16 @@ public class EnsureReplicationSchemaUseCaseTests
         await _useCase.ExecuteAsync(ct);
 
         // Assert
-        // 5 tablas + 16 campos = 21 operaciones totales
+        // 5 tablas + 17 campos = 22 operaciones totales
         // - QueueTable: 1 tabla + 5 campos
         // - AttemptTable: 1 tabla + 6 campos
         // - LogisticsCategoryTable: 1 tabla
         // - ProductBrandsTable: 1 tabla 
         // - BannersTable: 1 tabla (sin campos adicionales, solo Code/Name por defecto)
         // - ItemsTable: 5 campos
+        // - DocMarketingTable: 1 campo
         _output.WriteLine("📊 Total de operaciones ejecutadas: {0}", totalOperations);
-        Assert.Equal(21, totalOperations);
+        Assert.Equal(22, totalOperations);
         _output.WriteLine("✅ ÉXITO: Número de operaciones es correcto");
     }
 

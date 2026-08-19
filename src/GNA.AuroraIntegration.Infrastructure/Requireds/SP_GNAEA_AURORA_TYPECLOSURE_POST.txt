@@ -1,0 +1,85 @@
+﻿CREATE PROCEDURE SP_GNAEA_AURORA_TYPECLOSURE_POST(
+    in object_type nvarchar(30), 				-- SBO Object Type
+	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
+	in num_of_cols_in_key int,
+	in list_of_key_cols_tab_del nvarchar(255),
+	in list_of_cols_val_tab_del nvarchar(255),
+	out error_code    INT,
+    out error_message NVARCHAR(200)
+)
+LANGUAGE SQLSCRIPT
+AS
+BEGIN
+
+	-- Cierre de Orden de Compra: determina si el cierre fue MANUAL o AUTOMATICO segun exista Entrada de Mercancias o Factura de Compras relacionada
+	IF (:object_type = '22' AND :transaction_type = 'L') THEN
+	BEGIN
+	
+		DECLARE ClsDocEntry     INTEGER;
+		DECLARE ClsAlreadySet   INTEGER;
+		DECLARE ClsRelatedCount INTEGER;
+		DECLARE ClsReason       NVARCHAR(20);
+	
+		ClsDocEntry := :list_of_cols_val_tab_del;
+	
+		ClsAlreadySet := IFNULL(
+			(SELECT COUNT(*) FROM "OPOR"
+			 WHERE "DocEntry" = :ClsDocEntry
+			   AND "DocStatus" = 'C'
+			   AND IFNULL("U_GNA_AUR_TypeClosure", '') = ''), 0);
+	
+		IF (:ClsAlreadySet > 0) THEN
+	
+			ClsRelatedCount := IFNULL(
+				(SELECT COUNT(*) FROM "PDN1" WHERE "BaseType" = 22 AND "BaseEntry" = :ClsDocEntry)
+				+ (SELECT COUNT(*) FROM "PCH1" WHERE "BaseType" = 22 AND "BaseEntry" = :ClsDocEntry), 0);
+	
+			ClsReason := CASE WHEN :ClsRelatedCount = 0 THEN 'MANUAL' ELSE 'AUTO' END;
+	
+			UPDATE "OPOR"
+			SET "U_GNA_AUR_TypeClosure" = :ClsReason
+			WHERE "DocEntry" = :ClsDocEntry;
+	
+		END IF;
+	
+	END;
+	END IF;
+	
+	-- Cierre de Solicitud de Traslado: determina si el cierre fue MANUAL o AUTOMATICO segun exista Traslado de Inventario relacionado
+	IF (:object_type = '1250000001' AND :transaction_type = 'L') THEN
+	BEGIN
+	
+		DECLARE WtqDocEntry     INTEGER;
+		DECLARE WtqAlreadySet   INTEGER;
+		DECLARE WtqRelatedCount INTEGER;
+		DECLARE WtqReason       NVARCHAR(20);
+	
+		WtqDocEntry := :list_of_cols_val_tab_del;
+	
+		WtqAlreadySet := IFNULL(
+			(SELECT COUNT(*) FROM "OWTQ"
+			 WHERE "DocEntry" = :WtqDocEntry
+			   AND "DocStatus" = 'C'
+			   AND IFNULL("U_GNA_AUR_TypeClosure", '') = ''), 0);
+	
+		IF (:WtqAlreadySet > 0) THEN
+	
+			WtqRelatedCount := IFNULL(
+				(SELECT COUNT(*) FROM "WTR1" WHERE "BaseType" = 1250000001 AND "BaseEntry" = :WtqDocEntry), 0);
+	
+			WtqReason := CASE WHEN :WtqRelatedCount = 0 THEN 'MANUAL' ELSE 'AUTO' END;
+	
+			UPDATE "OWTQ"
+			SET "U_GNA_AUR_TypeClosure" = :WtqReason
+			WHERE "DocEntry" = :WtqDocEntry;
+	
+		END IF;
+	
+	END;
+	END IF;
+	
+	
+	SELECT :error_code, :error_message FROM DUMMY;
+	RETURN;
+
+END;

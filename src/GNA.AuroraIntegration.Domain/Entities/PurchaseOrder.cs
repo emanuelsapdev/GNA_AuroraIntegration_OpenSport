@@ -23,6 +23,7 @@ public sealed class PurchaseOrder
     /// cancelar la OC en Aurora en lugar de crearla/reconciliarla.
     /// </summary>
     public bool Cancelled { get; init; }
+    public bool IsClosedManual { get; init; }
 
     // TODO (Etapa 1 - pendiente de definición de negocio): Aurora admite bannerName/bannerExternalId
     // opcionales en la creación de la OC. No hay campo SAP mapeado hoy; se omiten en la replicación.

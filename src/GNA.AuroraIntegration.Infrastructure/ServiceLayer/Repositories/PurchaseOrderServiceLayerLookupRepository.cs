@@ -77,6 +77,8 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
             string fields = $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocEntryField}," +
                             $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocNumField}," +
                             $"{SapB1PurchaseOrdersConstants.PurchaseOrders.CancelledField}," +
+                            $"{SapB1PurchaseOrdersConstants.PurchaseOrders.TypeClosureField}," +
+                            $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocumentStatusField}," +
                             $"{SapB1PurchaseOrdersConstants.PurchaseOrders.DocumentLinesField}";
 
             var resource = $"{SapB1PurchaseOrdersConstants.PurchaseOrders.Endpoint}?$filter={filter}" +
@@ -106,6 +108,10 @@ public sealed class PurchaseOrderServiceLayerLookupRepository : IPurchaseOrderLo
         DocNum = dto.DocNum,
         Cancelled = string.Equals(
             dto.Cancelled, SapB1PurchaseOrdersConstants.PurchaseOrders.CancelledYesValue, StringComparison.OrdinalIgnoreCase),
+        IsClosedManual = string.Equals(
+            dto.TypeClosure, SapB1PurchaseOrdersConstants.PurchaseOrders.TypeClosureManualValue, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(
+            dto.DocumentStatus, SapB1PurchaseOrdersConstants.PurchaseOrders.DocumentStatusCloseValue, StringComparison.OrdinalIgnoreCase),
         Lines = [.. dto.DocumentLines.Select(line => new PurchaseOrderLine
         {
             LineOrder = line.LineNum,
@@ -130,9 +136,12 @@ internal sealed class ServiceLayerPurchaseOrderDto
 {
     public int DocEntry { get; set; }
     public int? DocNum { get; set; }
-
-    /// <summary>"tYES"/"tNO" (BoYesNoEnum). Ver SapB1PurchaseOrdersConstants.CancelledField.</summary>
     public string? Cancelled { get; set; }
+    public string? DocumentStatus { get; set; }
+
+
+    [JsonPropertyName(SapB1PurchaseOrdersConstants.PurchaseOrders.TypeClosureField)]
+    public string? TypeClosure { get; set; }
 
     public List<ServiceLayerPurchaseOrderLineDto> DocumentLines { get; set; } = [];
 }

@@ -181,7 +181,7 @@ public sealed class InventoryTransferRequestSyncUseCaseTests
     [Fact(DisplayName = "⏺ Debe cancelar en Aurora una orden cancelada en SAP que ya existía allí")]
     public async Task ExecuteAsync_ShouldCancelInAurora_WhenInventoryTransferRequestIsCancelledAndExists()
     {
-        InventoryTransferRequest InventoryTransferRequest = CreateInventoryTransferRequest(7001, cancelled: true, ("SKU-001", 10m));
+        InventoryTransferRequest InventoryTransferRequest = CreateInventoryTransferRequest(7001, isClosedManual: true, ("SKU-001", 10m));
 
         _repositoryMock
             .Setup(r => r.GetPendingInventoryTransferRequestAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -207,7 +207,7 @@ public sealed class InventoryTransferRequestSyncUseCaseTests
     [Fact(DisplayName = "⏺ No debe llamar a Aurora para cancelar una orden que nunca existió allí")]
     public async Task ExecuteAsync_ShouldNotCallCancel_WhenCancelledInventoryTransferRequestNeverExistedInAurora()
     {
-        InventoryTransferRequest InventoryTransferRequest = CreateInventoryTransferRequest(7002, cancelled: true, ("SKU-001", 10m));
+        InventoryTransferRequest InventoryTransferRequest = CreateInventoryTransferRequest(7002, isClosedManual: true, ("SKU-001", 10m));
 
         _repositoryMock
             .Setup(r => r.GetPendingInventoryTransferRequestAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -306,14 +306,14 @@ public sealed class InventoryTransferRequestSyncUseCaseTests
 
     private static InventoryTransferRequest CreateInventoryTransferRequest(
         int docEntry, params (string Sku, decimal Quantity)[] lines)
-        => CreateInventoryTransferRequest(docEntry, cancelled: false, lines);
+        => CreateInventoryTransferRequest(docEntry, isClosedManual: false, lines);
 
     private static InventoryTransferRequest CreateInventoryTransferRequest(
-        int docEntry, bool cancelled, params (string Sku, decimal Quantity)[] lines) => new()
+        int docEntry, bool isClosedManual, params (string Sku, decimal Quantity)[] lines) => new()
     {
         DocEntry = docEntry,
         DocNum = docEntry,
-        Cancelled = cancelled,
+        IsClosedManual = isClosedManual,
         Lines = [.. lines.Select((line, index) => new InventoryTransferRequestLine
         {
             LineOrder = index,

@@ -8,41 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace GNA.AuroraIntegration.Application.UseCases.Outbound;
 
-/// <summary>
-/// Caso de uso: toma Solicitudes de Traslado pendientes de SAP B1 (Alta, Modificación o
-/// Cancelación) y las refleja en Aurora WMS como "transfer out orders".
-///
-/// - Si la orden está cancelada en SAP (InventoryTransferRequest.Cancelled, ver
-///   InventoryTransferRequestServiceLayerLookupRepository): se cancela en Aurora (DELETE), o
-///   no se hace nada si nunca llegó a existir allí. Esta rama tiene prioridad sobre
-///   Alta/Modificación: una orden cancelada nunca se crea ni se reconcilia, sin importar con
-///   qué Operation haya quedado encolada la entrada.
-/// - Si no está cancelada y no existe todavía en Aurora (chequeo vía GET): se crea completa.
-/// - Si no está cancelada y ya existe: se reconcilia el estado actual de SAP contra el de
-///   Aurora (GET .../articles), con una diferencia importante respecto a PurchaseOrder:
-///
-///   ⚠️ La API de Aurora NO expone POST .../transfer-out-orders/{externalId}/articles (alta
-///   de artículos sobre una orden existente) — a diferencia de purchase-orders y sale-orders,
-///   que sí lo tienen. Solo existen PATCH (editar línea existente) y DELETE (eliminar línea)
-///   a nivel de artículo. Por lo tanto:
-///     • líneas nuevas en SAP  → NO se pueden agregar vía API; se loguea una advertencia y se
-///       omiten (limitación real de la API de Aurora, no una decisión de negocio).
-///     • líneas presentes en ambos lados con cantidad distinta → se editan (PATCH .../articles/{sku})
-///     • líneas que ya no están en SAP → se eliminan (DELETE .../articles/{sku})
-///   Las líneas con fulfilledQuantity > 0 en Aurora (ya recibidas/en proceso en el depósito)
-///   NUNCA se editan ni se eliminan — se loguea una advertencia y se continúa, para no
-///   interferir con mercadería que el depósito ya procesó.
-///
-/// Fuera de alcance todavía (backlog):
-///   - Sincronización de campos de header vía PATCH .../transfer-out-orders/{externalId}
-///     (bannerName/bannerExternalId/notes/etc.): Aurora sí expone este endpoint (a diferencia
-///     de purchase-orders), pero documenta una precondición de estado ("Estado de la orden ->
-///     PENDIENTE, CONGELADA. Utilizar estado TO_EDIT para modificar el pedido.") sin que exista
-///     hoy una definición de negocio sobre cuándo disparar esa transición — no se implementa
-///     para no inventar ese comportamiento. Ver IAuroraInventoryTransferRequestApiClient.UpdateInventoryTransferRequestHeaderAsync.
-///   - logisticOperatorExternalId/postalCode/shippingPriorityExternalId en la creación: sin
-///     campo SAP (OWTQ) mapeado hoy — ver CreateAuroraInventoryTransferRequestDto.
-/// </summary>
 public sealed class InventoryTransferRequestSyncUseCase : IInventoryTransferRequestSyncUseCase
 {
     private readonly IInventoryTransferRequestReplicationRepository _repository;
@@ -81,7 +46,7 @@ public sealed class InventoryTransferRequestSyncUseCase : IInventoryTransferRequ
 
                 try
                 {
-                    if (InventoryTransferRequest.Cancelled)
+                    if (InventoryTransferRequest.IsClosedManual)
                     {
                         await CancelInAuroraAsync(docEntry, ct);
                         _logger.LogInformation("Solicitud de Traslado '{DocEntry}' cancelada en Aurora.", docEntry);

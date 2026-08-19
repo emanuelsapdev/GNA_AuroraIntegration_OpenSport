@@ -21,16 +21,8 @@ public static class SapB1InventoryTransferRequestsConstants
         public const string DocEntryField = "DocEntry";
         public const string DocNumField = "DocNum";
         public const string DocumentLinesField = "DocumentLines";
-
-        /// <summary>
-        /// Campo estándar de documento (BoYesNoEnum) que indica si la Solicitud de Traslado
-        /// fue cancelada mediante la acción oficial de Cancelar Documento en SAP B1. Verificar
-        /// en Service Layer $metadata que el nombre/tipo coincide con la versión de B1 en uso.
-        /// </summary>
         public const string DocumentStatusField = "DocumentStatus";
-
-        /// <summary>Valor literal que Service Layer usa para BoYesNoEnum = tYES.</summary>
-        public const string CancelledYesValue = "tYES";
+        public const string TypeClosureField = "U_GNA_AUR_TypeClosure";
 
         public static class Lines
         {
@@ -38,5 +30,14 @@ public static class SapB1InventoryTransferRequestsConstants
             public const string ItemCodeField = "ItemCode";
             public const string QuantityField = "Quantity";
         }
+
+        /// <summary>Valor literal que Service Layer usa para BoYesNoEnum = tYES.</summary>
+        public const string CancelledYesValue = "tYES";
+
+        /// <summary>Valor literal que Service Layer usa para TypeClosure = MANUAL</summary>
+        public const string TypeClosureManualValue = "MANUAL";
+
+        /// <summary>Valor literal que Service Layer usa para DocumentStatus = bost_Close</summary>
+        public const string DocumentStatusCloseValue = "bost_Close";
     }
 }

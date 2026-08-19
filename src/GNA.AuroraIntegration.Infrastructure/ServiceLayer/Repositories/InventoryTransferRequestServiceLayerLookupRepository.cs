@@ -5,6 +5,7 @@ using GNA.AuroraIntegration.Infrastructure.ServiceLayer.Constants;
 using GNA.AuroraIntegration.Infrastructure.ServiceLayer.DTOs;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace GNA.AuroraIntegration.Infrastructure.ServiceLayer.Repositories;
 
@@ -76,6 +77,7 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
 
             string fields = $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocEntryField}," +
                             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocNumField}," +
+                            $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.TypeClosureField}," +
                             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocumentStatusField}," +
                             $"{SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocumentLinesField}";
 
@@ -104,8 +106,10 @@ public sealed class InventoryTransferRequestServiceLayerLookupRepository : IInve
     {
         DocEntry = dto.DocEntry,
         DocNum = dto.DocNum,
-        Cancelled = string.Equals(
-            dto.Cancelled, SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.CancelledYesValue, StringComparison.OrdinalIgnoreCase),
+        IsClosedManual = string.Equals(
+            dto.TypeClosure, SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.TypeClosureManualValue, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(
+            dto.DocumentStatus, SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.DocumentStatusCloseValue, StringComparison.OrdinalIgnoreCase),
         Lines = [.. dto.DocumentLines.Select(line => new InventoryTransferRequestLine
         {
             LineOrder = line.LineNum,
@@ -130,9 +134,10 @@ internal sealed class ServiceLayerInventoryTransferRequestDto
 {
     public int DocEntry { get; set; }
     public int? DocNum { get; set; }
-
-    // TODO: ADAPTAR EL CANCELLED QUE NO EXISTE AL ESTADO DEL DOCUMENTO.
     public string? DocumentStatus { get; set; }
+
+    [JsonPropertyName(SapB1InventoryTransferRequestsConstants.InventoryTransferRequests.TypeClosureField)]
+    public string? TypeClosure { get; set; }
 
     public List<ServiceLayerInventoryTransferRequestLineDto> DocumentLines { get; set; } = [];
 }

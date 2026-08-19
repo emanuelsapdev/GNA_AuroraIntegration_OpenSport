@@ -1,6 +1,4 @@
--- B1 DEPENDS: BEFORE:PT:PROCESS_START
-
-ALTER PROCEDURE SBO_SP_TransactionNotification
+﻿ALTER PROCEDURE SBO_SP_PostTransactionNotice
 (
 	in object_type nvarchar(30), 				-- SBO Object Type
 	in transaction_type nchar(1),			-- [A]dd, [U]pdate, [D]elete, [C]ancel, C[L]ose
@@ -18,38 +16,35 @@ begin
 error := 0;
 error_message := N'Ok';
 
---------------------------------------------------------------------------------------------------------------------------------
 
-
-CALL SP_GNAEA_ENQUEUE_ARTICLE_REPLICATION(
+--------------------------------------------------
+-- DESARROLLO AURORA ------------
+---------------------------------
+-- Post-procesamiento no bloqueante: setea U_GNA_AUR_TypeClosure (MANUAL/AUTOMATICO) al cerrar OPOR/OWTQ/...
+CALL SP_GNAEA_AURORA_TYPECLOSURE_POST(
 	:object_type,
 	:transaction_type,
 	:num_of_cols_in_key,
 	:list_of_key_cols_tab_del,
 	:list_of_cols_val_tab_del,
-	:error,
-	:error_message
+	error,
+	error_message
 );
 
-CALL SP_GNAEA_ENQUEUE_PURCHASEORDER_REPLICATION(
+
+-- Encola eventos de replicacion hacia Aurora WMS en @GNA_REP_QUEUE (Articulos, Ordenes de Compra, etc.)
+CALL SP_GNAEA_ENQUEUE_REPLICATION(
 	:object_type,
 	:transaction_type,
 	:num_of_cols_in_key,
 	:list_of_key_cols_tab_del,
 	:list_of_cols_val_tab_del,
-	:error,
-	:error_message
+	error,
+	error_message
 );
-
-CALL SP_GNAEA_ENQUEUE_TRANSFEROUT_REPLICATION(
-	:object_type,
-	:transaction_type,
-	:num_of_cols_in_key,
-	:list_of_key_cols_tab_del,
-	:list_of_cols_val_tab_del,
-	:error,
-	:error_message
-);
+--------------------------------------------------
+-- DESARROLLO AURORA ------------
+---------------------------------
 
 
 --------------------------------------------------------------------------------------------------------------------------------
